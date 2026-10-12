@@ -21,5 +21,6 @@
       ]
     }
   ],
-  "installCommand": "npm ci --omit=dev"
+  "installCommand": "npm ci --omit=dev",
+  "framework": null
 }

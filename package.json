@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node scripts/local-server.js",
+    "dev": "node --watch scripts/local-server.js",
     "test": "node --test tests/*.test.js",
     "build": "node scripts/build.js"
   },

@@ -44,7 +44,7 @@ The repository is `arkin-yno/Mark-Anthony-`. The website files must be committed
 ## 6. Deploy in Vercel
 
 1. Choose **Add New → Project** and import `arkin-yno/Mark-Anthony-`. If it is not listed, grant the Vercel GitHub integration access to that repository.
-2. Select framework preset **Other**. The root directory is the repository root; `vercel.json` supplies the build command and public output directory.
+2. Select framework preset **Other**. The repository explicitly pins this preset with `framework: null`; the local server is outside Vercel’s detection paths. The root directory is the repository root; `vercel.json` supplies the build command and public output directory.
 3. Expand **Environment Variables** and add these to Production and Preview:
 
    | Name | Value |

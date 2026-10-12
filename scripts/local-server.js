@@ -3,9 +3,9 @@ import { readFile, writeFile, mkdir, rename, unlink, stat } from 'node:fs/promis
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { defaultContent } from './content.js';
+import { defaultContent } from '../content.js';
 
-const root = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, '.data'));
 await mkdir(path.join(dataDir, 'uploads'), { recursive: true, mode: 0o700 });
 const contentPath = path.join(dataDir, 'content.json');

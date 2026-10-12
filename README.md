@@ -22,9 +22,9 @@ The name and initial tool list are editable starter content. Projects, testimoni
 
 ## Online hosting with Vercel and Supabase
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the free-tier setup walkthrough. The hosted website uses Supabase Authentication, an owner-protected content table, and a public photo bucket. Vercel serves `public/` and a `/api/config` endpoint that exposes only the public project URL and publishable key. No service-role or secret API key is required. Initialize the database using [supabase/setup.sql](supabase/setup.sql). The browser adapter keeps draft posts private through the database public-read function, refreshes login sessions, and rejects saving stale content after another session edits it.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the free-tier setup walkthrough. The hosted website uses Supabase Authentication, an owner-protected content table, and a public photo bucket. Vercel is explicitly configured with the **Other** preset (`framework: null`) and serves `public/` and a `/api/config` endpoint that exposes only the public project URL and publishable key. No service-role or secret API key is required. Initialize the database using [supabase/setup.sql](supabase/setup.sql). The browser adapter keeps draft posts private through the database public-read function, refreshes login sessions, and rejects saving stale content after another session edits it.
 
-`npm run build` checks the Vercel deployment files. Local `npm start` continues to use local data and generated-password authentication; local content is not automatically synced with Supabase. The cloud starts with the SQL script’s starter content. Follow the deployment walkthrough to publish and verify the real hosted site.
+`npm run build` checks the Vercel deployment files. The local server lives in `scripts/local-server.js` so it cannot be auto-detected as the Vercel production entry point. Local `npm start` continues to use local data and generated-password authentication; local content is not automatically synced with Supabase. The cloud starts with the SQL script’s starter content. Follow the deployment walkthrough to publish and verify the real hosted site.
 
 ## Local storage
 

@@ -12,7 +12,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
   const base = `http://127.0.0.1:${port}`;
   let child;
   const start = async () => {
-    child = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', DATA_DIR: dir }, stdio: ['ignore','pipe','pipe'] });
+    child = spawn(process.execPath, ['scripts/local-server.js'], { env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', DATA_DIR: dir }, stdio: ['ignore','pipe','pipe'] });
     await new Promise((resolve,reject) => { const timeout=setTimeout(()=>reject(new Error('Startup timed out')),10000); child.stdout.once('data',()=>{clearTimeout(timeout);resolve();}); child.once('exit',code=>{clearTimeout(timeout);reject(new Error('Server exited '+code));}); });
   };
   const stop = async () => { if(child && child.exitCode===null){const exited=new Promise(resolve=>child.once('exit',resolve));child.kill();await exited;} };
