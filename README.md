@@ -18,6 +18,15 @@ Choose **Manage website** at the bottom of the sidebar to open the private admin
 
 Use the editor to change website text, profile and project photos, contact links, services, tools, FAQs, and testimonials. Blog posts support ordered text and image blocks, cover images, captions, drafts, publishing, and unpublishing. **Preview** shows unsaved content; **Save changes** applies website edits and published posts to the public site. Uploaded images become public files, so do not upload confidential pictures. Removing a picture from content removes its reference, while the stored upload remains available for other uses.
 
+### New editor sections
+
+- **Portfolio** adds separate website showcases with highlighted names, screenshots, descriptions, and **Visit site** links. The sidebar places Portfolio directly below Home; existing Projects remain intact.
+- **Social links** accepts any platform name and profile URL, with optional custom icons. Links appear in the sidebar and as larger labeled contact buttons. You can reorder or remove them.
+- **About photos** adds pictures separately from your profile photo. Choose left, right, above, or below your biography, set the crop focus, and use the arrows to order photos. On mobile these positions become a vertical layout.
+- **Tools** is your complete tool list; each entry can have a custom logo, description, and website link. **Tools by role** creates headings such as SMM Tools, selects tools from the complete list, and links them to services. A tool can belong to several specialties. The matching service pages show only their assigned tools.
+
+Older saved content is upgraded in memory without modifying the database. Saving in the editor stores the new fields; no SQL rerun is required. All original profile content, projects, and blog posts are retained. Photo and logo uploads accept PNG, JPG, WebP, or GIF up to 3 MB.
+
 The name and initial tool list are editable starter content. Projects, testimonials, and blog posts start empty so no client results or endorsements are invented. Add your email or booking URL under **Photos & contact** to enable contact actions. Blog post text is plain text with preserved paragraphs.
 
 ## Online hosting with Vercel and Supabase

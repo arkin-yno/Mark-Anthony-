@@ -1,3 +1,4 @@
+import { normalizeContent } from './content-model.js';
 // Only the public Supabase URL and publishable key reach the browser.
 // Database and storage policies authorize the owner; no privileged key is used.
 export let backend = { mode: 'local' };
@@ -48,14 +49,14 @@ export async function portfolioApi(url, options={}) {
   await configureBackend();
   if (backend.mode==='local') {
     const response=await fetch(url,{...options,headers:{'Content-Type':'application/json',...options.headers}});
-    const data=await response.json();if(!response.ok)throw new Error(data.error||'Something went wrong.');return data;
+    const data=await response.json();if(!response.ok)throw new Error(data.error||'Something went wrong.');return ['/api/content','/api/admin/content'].includes(url) && (!options.method || options.method==='GET') ? normalizeContent(data) : data;
   }
   const method=options.method || 'GET';
   const body=options.body ? JSON.parse(options.body) : {};
   if(url==='/api/content') {
     const content=await request('/rest/v1/rpc/portfolio_public',{method:'POST',body:'{}'});
     if (!content?.profile) throw new Error('Website content is not initialized. Run supabase/setup.sql.');
-    return content;
+    return normalizeContent(content);
   }
   if(url==='/api/login') {
     const session=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:body.email,password:body.password})});
@@ -67,7 +68,7 @@ export async function portfolioApi(url, options={}) {
   if(url==='/api/admin/content' && method==='GET') {
     const rows=await request('/rest/v1/portfolio_content?id=eq.1&select=data,updated_at',{},token);
     if(!rows?.length)throw new Error('This account is not authorized to edit this website.');
-    contentRevision=rows[0].updated_at;return rows[0].data;
+    contentRevision=rows[0].updated_at;return normalizeContent(rows[0].data);
   }
   if(url==='/api/admin/content' && method==='PUT') {
     if(!contentRevision)throw new Error('Reload the editor before saving.');

@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir, rename, unlink, stat } from 'node:fs/promis
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { normalizeContent } from '../public/content-model.js';
 import { defaultContent } from '../content.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,15 +41,20 @@ function session(req) {
 }
 function secureCookie(req) { return process.env.COOKIE_SECURE === 'true' || req.socket.encrypted; }
 function cookie(req, token, age) { return `session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${age}${secureCookie(req) ? '; Secure' : ''}`; }
+function shapeTools(c) { return c.tools.every(t => t && ['id','name','logo','description','url'].every(k => typeof t[k]==='string' && t[k].length<=20000)); }
 function validateContent(c) {
   if (!c || typeof c.profile !== 'object' || !c.profile || Array.isArray(c.profile)) return false;
   const strings = Object.keys(defaultContent.profile);
   if (!strings.every(k => typeof c.profile[k] === 'string' && c.profile[k].length <= 20000)) return false;
-  if (!['tools','services','projects','testimonials','posts','faqs'].every(k => Array.isArray(c[k]) && c[k].length <= 500)) return false;
-  if (!c.tools.every(t => typeof t === 'string' && t.length <= 200)) return false;
+  if (!['tools','services','projects','testimonials','posts','faqs','portfolio','socialLinks','aboutPhotos','toolGroups'].every(k => Array.isArray(c[k]) && c[k].length <= 500)) return false;
+  if (!shapeTools(c)) return false;
   const shape = (rows, fields) => rows.every(r => r && fields.every(k => typeof r[k] === 'string' && r[k].length <= 100000));
-  if (!shape(c.services,['title','category','icon','description','details']) || !c.services.every(r => typeof r.featured === 'boolean')) return false;
+  if (!shape(c.services,['id','title','category','icon','description','details']) || !c.services.every(r => typeof r.featured === 'boolean')) return false;
   if (!shape(c.projects,['title','description','category','image','url'])) return false;
+  if (!shape(c.portfolio,['title','description','category','image','url'])) return false;
+  if (!shape(c.socialLinks,['id','label','url','logo'])) return false;
+  if (!shape(c.aboutPhotos,['id','image','caption','placement','focus']) || !c.aboutPhotos.every(p => ['left','right','above','below'].includes(p.placement) && ['center','top','bottom','left','right'].includes(p.focus))) return false;
+  if (!shape(c.toolGroups,['id','title']) || !c.toolGroups.every(g => Array.isArray(g.toolIds) && g.toolIds.every(id => typeof id==='string') && Array.isArray(g.serviceIds) && g.serviceIds.every(id => typeof id==='string'))) return false;
   if (!shape(c.testimonials,['name','role','quote','image'])) return false;
   if (!shape(c.faqs,['question','answer'])) return false;
   if (!shape(c.posts,['id','title','excerpt','date','cover']) || !c.posts.every(p => typeof p.published === 'boolean' && Array.isArray(p.blocks) && shape(p.blocks,['type','text','image','caption']) && p.blocks.every(b => ['text','image'].includes(b.type)))) return false;
@@ -92,7 +98,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/admin/content' && req.method === 'GET') return send(res,200,content);
       if (p === '/api/admin/content' && req.method === 'PUT') {
-        const c = await body(req, 2_000_000);
+        const c = normalizeContent(await body(req, 2_000_000));
         if (!validateContent(c)) return send(res,400,{error:'Content format is invalid. Check the fields and try again.'});
         const tmp = contentPath + '.' + randomBytes(8).toString('hex') + '.tmp';
         await writeFile(tmp,JSON.stringify(c,null,2),{mode:0o600}); await rename(tmp,contentPath); content=c;

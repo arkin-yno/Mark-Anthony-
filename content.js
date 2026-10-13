@@ -1,4 +1,5 @@
-export const defaultContent = {
+import { normalizeContent } from './public/content-model.js';
+export const defaultContent = normalizeContent({
   profile: {
     name: 'Mark Anthony', role: 'Your all-around business partner', initials: 'MA', photo: '',
     headline: 'You’ve found me.',
@@ -28,4 +29,4 @@ export const defaultContent = {
     { question: 'Can I work with you on more than one service?', answer: 'Yes. We can combine services around your business needs, from an individual project to ongoing support.' },
     { question: 'How do we get started?', answer: 'Use the contact details on this page to introduce your business, your goals, and the tasks you need help with. We can then discuss scope, timing, and next steps.' }
   ]
-};
+});
