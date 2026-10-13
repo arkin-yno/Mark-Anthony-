@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, rename, unlink, stat } from 'node:fs/promis
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { normalizeContent } from '../public/content-model.js';
+import { normalizeContent, allProcessSteps } from '../public/content-model.js';
 import { defaultContent } from '../content.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,7 +63,9 @@ function validateContent(c) {
   if (!uniqueIds(c.testimonials)) return false;
   if (!c.services.every(service => Array.isArray(service.blocks) && service.blocks.length<=500 && shape(service.blocks,['id','type','title','text','image','caption','url']) && service.blocks.every(block=>['text','image','link'].includes(block.type)))) return false;
   if (!c.process || typeof c.process.heading!=='string' || typeof c.process.intro!=='string' || !Array.isArray(c.process.steps) || c.process.steps.length>100 || !shape(c.process.steps,['id','title','description','icon'])) return false;
-  if (!uniqueIds(c.process.steps) || !c.process.steps.every(step => step.serviceIds===undefined || ids(step.serviceIds))) return false;
+  if (!Array.isArray(c.process.workflows) || c.process.workflows.length>500 || !shape(c.process.workflows,['id','serviceId','heading','intro']) || !uniqueIds(c.process.workflows) || !c.process.workflows.every(workflow =>
+    workflow.serviceId.length>0 && workflow.serviceId.length<=1000 && Array.isArray(workflow.steps) && workflow.steps.length<=100 && shape(workflow.steps,['id','title','description','icon']))) return false;
+  if (!uniqueIds(allProcessSteps(c)) || !allProcessSteps(c).every(step => step.serviceIds===undefined || ids(step.serviceIds))) return false;
   if (c.experiences!==undefined && (!Array.isArray(c.experiences) || c.experiences.length>500 || !shape(c.experiences,['id','name','kind','role','period','location','description','highlights','image','url']) || !uniqueIds(c.experiences) || !c.experiences.every(experience =>
     ['company','person'].includes(experience.kind) && ['serviceIds','portfolioIds','projectIds','toolIds','testimonialIds','processStepIds','postIds'].every(key => experience[key]===undefined || ids(experience[key])) &&
     (experience.links===undefined || (Array.isArray(experience.links) && experience.links.length<=100 && shape(experience.links,['label','url']) && uniqueIds(experience.links)))))) return false;

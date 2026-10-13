@@ -37,6 +37,18 @@ a.service-card{display:block;color:var(--ink)}.service-open-label{display:flex;a
 .content-filters input::placeholder{color:#8493a9}
 .collection-result-count{font-size:12px;color:#8293ab;margin:0 0 20px}
 .process-results{min-width:0}
+.process-workflow{margin-bottom:28px;min-width:0}
+.process-workflow:last-child{margin-bottom:0}
+.process-workflow-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:15px 22px;flex-wrap:wrap;margin-bottom:21px;min-width:0}
+.process-workflow-heading>div{flex:1;min-width:0}
+.process-workflow-heading h2{font-size:24px;font-weight:750;line-height:1.4;letter-spacing:-.5px;overflow-wrap:anywhere;margin:0}
+.process-workflow-heading p{font-size:14px;line-height:1.8;color:#7487a4;white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0 0}
+.process-workflow-intro{font-size:14px;line-height:1.8;color:#7487a4;white-space:pre-wrap;overflow-wrap:anywhere;margin:-7px 0 22px;max-width:850px}
+.process-workflow-heading>p{flex-basis:100%}
+.process-workflow-heading>a{font-size:12px;line-height:1.6;max-width:100%;overflow-wrap:anywhere;flex-shrink:0}
+.process-step h3{font-size:23px;letter-spacing:-.5px;overflow-wrap:anywhere;margin:0 0 13px}
+.process-scope-selector{margin-bottom:22px;min-width:0}
+.process-scope-selector .field:last-child{margin-bottom:0}
 .process-service-tags,.experience-service-tags,.experience-connections{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
 .process-service-tags>a,.process-service-tags>span,.experience-service-tags>a,.experience-service-tags>span,.experience-connections>a,.experience-connections>span{display:inline-flex;align-items:center;gap:7px;max-width:100%;font-size:11px;line-height:1.6;padding:7px 11px;background:#eaf1ff;color:#456b9e;border:1px solid #dce7fa;border-radius:7px;overflow-wrap:anywhere}
 .process-service-tags>a:hover,.experience-service-tags>a:hover,.experience-connections>a:hover{background:#dde9ff;color:#264e88;border-color:#b9cdef}
@@ -88,4 +100,5 @@ a.service-card{display:block;color:var(--ink)}.service-open-label{display:flex;a
 .experience-editor-connections .selection-list{margin:18px 0}
 @media(max-width:1100px){.experience-grid{grid-template-columns:minmax(0,1fr)}.experience-card,.experience-section{padding:26px}.experience-detail-header{gap:24px;padding:28px}}
 @media(max-width:700px){.process-timeline:has(>.process-step:nth-child(2):last-child){grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.process-workflow{margin-bottom:25px}.process-workflow-heading{flex-direction:column;gap:10px;margin-bottom:18px}.process-workflow-heading>div{width:100%}.process-workflow-heading h2{font-size:23px}.process-workflow-heading p{font-size:14px}.process-workflow-heading>p{flex-basis:auto}.process-step h3{font-size:24px}}
 @media(max-width:700px){.content-filters{align-items:stretch;flex-direction:column;gap:15px}.content-filters label{flex:0 1 auto;font-size:14px}.content-filters input,.content-filters select{font-size:14px}.experience-grid{gap:17px}.experience-card,.experience-section{padding:23px}.experience-card-head{align-items:flex-start;gap:15px}.experience-logo{width:64px;height:64px;flex-basis:64px;border-radius:11px}.experience-card h2{font-size:23px}.experience-description{font-size:14px}.experience-meta{font-size:12px;gap:5px 11px}.experience-detail-header{flex-direction:column;align-items:flex-start;gap:20px;padding:24px}.experience-photo{width:112px;height:112px;flex-basis:112px;border-radius:16px}.experience-detail-header>div{width:100%}.experience-detail-header h1{font-size:30px}.process-service-tags,.experience-service-tags,.experience-connections{gap:7px}.process-service-tags>a,.process-service-tags>span,.experience-service-tags>a,.experience-service-tags>span,.experience-connections>a,.experience-connections>span{font-size:11px}.experience-custom-links{flex-direction:column;align-items:stretch}.experience-custom-links>a{justify-content:center}.experience-link-editor{padding:16px}.experience-editor-connections{padding:0 15px}.experience-editor-connections>summary{font-size:13px}}

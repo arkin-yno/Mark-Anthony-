@@ -34,9 +34,9 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     c.services[0].overview='Detailed service information';
     c.services[0].blocks=[{id:'section',type:'text',title:'More about this service',text:'Additional details',image:'',caption:'',url:''}];
     c.process.steps[0].title='My discovery step';
-    c.process.steps[0].serviceIds=[c.services[0].id];
+    c.process.workflows=[{id:'smm-process',serviceId:c.services[0].id,heading:'My social media process',intro:'A complete workflow',steps:[{id:'smm-audit',title:'Audit social channels',description:'Review the existing channels and plan next steps.',icon:'target'}]}];
     c.experiences=[{id:'client-experience',name:'Example company',kind:'company',role:'Marketing support',period:'2024–2025',location:'Remote',description:'Work history',highlights:'Campaign planning',image:'',url:'https://example.com',
-      serviceIds:[c.services[0].id],portfolioIds:['website'],projectIds:['sample'],toolIds:[c.tools[0].id],testimonialIds:['testimonial-1'],processStepIds:[c.process.steps[0].id],postIds:['live'],links:[{id:'company-link',label:'Company website',url:'https://example.com'}]}];
+      serviceIds:[c.services[0].id],portfolioIds:['website'],projectIds:['sample'],toolIds:[c.tools[0].id],testimonialIds:['testimonial-1'],processStepIds:['smm-audit'],postIds:['live'],links:[{id:'company-link',label:'Company website',url:'https://example.com'}]}];
     c.posts=[{id:'draft',title:'Private draft',excerpt:'',date:'2026-10-13',cover:'',published:false,blocks:[]},{id:'live',title:'Published story',excerpt:'A story',date:'2026-10-13',cover:'',published:true,blocks:[{type:'text',text:'Hello reader',image:'',caption:''}]}];
     assert.equal((await req('/api/admin/content','PUT',c,{Origin:'https://other.example'})).status,403);
     assert.equal((await req('/api/admin/content','PUT',{...c,services:[{}]})).status,400);
@@ -44,6 +44,12 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,steps:'invalid'}})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,steps:[{...c.process.steps[0],serviceIds:'invalid'}]}})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,steps:[{...c.process.steps[0],serviceIds:null}]}})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,workflows:'invalid'}})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,workflows:[{...c.process.workflows[0],serviceId:null}]}})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,workflows:[{...c.process.workflows[0],steps:'invalid'}]}})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,workflows:[c.process.workflows[0],c.process.workflows[0]]}})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,workflows:[{...c.process.workflows[0],steps:[{...c.process.steps[0]}]}]}})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,process:{...c.process,workflows:[{...c.process.workflows[0],steps:Array.from({length:101},(_,i)=>({...c.process.workflows[0].steps[0],id:'over-limit-'+i}))}]}})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,experiences:[c.experiences[0],c.experiences[0]]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,experiences:[{...c.experiences[0],kind:'invalid'}]})).status,400);
     for(const relation of ['serviceIds','portfolioIds','projectIds','toolIds','testimonialIds','processStepIds','postIds']) {
@@ -53,7 +59,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.equal((await req('/api/admin/content','PUT',{...c,experiences:[{...c.experiences[0],links:'invalid'}]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,experiences:[{...c.experiences[0],links:[{label:'Missing URL'}]}]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,portfolio:[c.portfolio[0],c.portfolio[0]]})).status,400);
-    const legacy=structuredClone(c);delete legacy.experiences;legacy.process.steps.forEach(step=>delete step.serviceIds);
+    const legacy=structuredClone(c);delete legacy.experiences;delete legacy.process.workflows;legacy.process.steps.forEach(step=>delete step.serviceIds);
     assert.equal((await req('/api/admin/content','PUT',legacy)).status,200);
     assert.equal((await req('/api/admin/content','PUT',c)).status,200);
     const pub=await (await req('/api/content')).json();
@@ -62,7 +68,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.deepEqual(pub.portfolio,c.portfolio);
     assert.deepEqual(pub.services[0].blocks,c.services[0].blocks);
     assert.deepEqual(pub.experiences,c.experiences);
-    assert.deepEqual(pub.process.steps[0].serviceIds,c.process.steps[0].serviceIds);
+    assert.deepEqual(pub.process.workflows,c.process.workflows);
     assert.equal((await (await req('/api/admin/content')).json()).posts.length,2);
     assert.equal((await req('/api/admin/upload','POST',{data:Buffer.from('<svg onload="alert(1)"></svg>').toString('base64')})).status,400);
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY1cAAAAASUVORK5CYII=';
@@ -76,7 +82,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     const restored=await (await req('/api/content')).json();
     assert.deepEqual(restored.projects,c.projects);
     assert.equal(restored.process.steps[0].title,'My discovery step');
-    assert.deepEqual(restored.process.steps[0].serviceIds,c.process.steps[0].serviceIds);
+    assert.deepEqual(restored.process.workflows,c.process.workflows);
     assert.deepEqual(restored.experiences,c.experiences);
     const again=await req('/api/login','POST',{password});cookie=again.headers.get('set-cookie').split(';')[0];
     const newPassword='A-long-test-password-4826';

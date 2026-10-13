@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processStepsForService, experiencesForService, removeContentItem} from '../public/content-model.js';
+import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processWorkflows, processStepsForService, allProcessSteps, experiencesForService, removeContentItem} from '../public/content-model.js';
 
 test('existing saved content upgrades without mutating text, photos, projects, or posts', () => {
   const before={profile:{name:'Existing owner',photo:'/original.png',linkedin:'https://linkedin.com/in/owner',facebook:'',instagram:''},tools:['Canva','Meta Ads'],services:[{title:'SMM'}],projects:[{title:'Existing project'}],posts:[{title:'Existing blog'}],testimonials:[],faqs:[]};
@@ -82,7 +82,8 @@ test('legacy process, testimonial, and experience records receive stable IDs wit
   assert.equal(c.process.heading,'My own process');
   assert.equal(c.process.steps[0].description,'Original step');
   assert.equal(c.experiences[0].description,'Original work');
-  assert.deepEqual(c.process.steps[0].serviceIds,[]);
+  assert.equal(c.process.steps[0].serviceIds,undefined);
+  assert.deepEqual(c.process.workflows,[]);
   assert.deepEqual(c.experiences[0].serviceIds,[]);
   assert.deepEqual(c.experiences[0].postIds,[]);
   assert.deepEqual(c.experiences[1].links,before.experiences[1].links);
@@ -97,7 +98,7 @@ test('legacy process, testimonial, and experience records receive stable IDs wit
   assert.deepEqual(normalizeContent(c).process.steps,[]);
 });
 
-test('process search and service filters combine without reordering steps or including unassigned legacy steps', () => {
+test('process search returns complete independent service workflows with their original ordered steps', () => {
   const c=normalizeContent({profile:{},tools:[],services:[{id:'smm',title:'Social Media Management'},{id:'ads',title:'Paid Ads'}],
     process:{heading:'Process',intro:'',steps:[
       {id:'legacy',title:'General introduction',description:'Original step',icon:'target'},
@@ -105,17 +106,56 @@ test('process search and service filters combine without reordering steps or inc
       {id:'shared-plan',title:'Plan',description:'Build a campaign calendar',icon:'layers',serviceIds:['smm','ads']},
       {id:'ads-execute',title:'Execute',description:'Launch paid campaigns',icon:'bolt',serviceIds:['ads']}
     ]},experiences:[{id:'legacy-client',name:'Legacy client'},{id:'smm-client',name:'SMM client',serviceIds:['smm']},{id:'shared-client',name:'Shared client',serviceIds:['smm','ads']}]});
-  assert.deepEqual(processStepsForService(c).map(step=>step.id),['legacy','smm-discover','shared-plan','ads-execute']);
+  assert.deepEqual(processStepsForService(c).map(step=>step.id),['legacy','smm-discover','shared-plan','shared-plan-ads','ads-execute']);
+  assert.deepEqual(processWorkflows(c).map(workflow=>workflow.serviceId),['','smm','ads']);
+  assert.equal(processWorkflows(c)[0].heading,'General process');
   assert.deepEqual(processStepsForService(c,'smm').map(step=>step.id),['smm-discover','shared-plan']);
-  assert.deepEqual(processStepsForService(c,'ads','  CAMPAIGN  ').map(step=>step.id),['shared-plan','ads-execute']);
+  assert.deepEqual(processStepsForService(c,'ads','  CAMPAIGN  ').map(step=>step.id),['shared-plan-ads','ads-execute']);
   assert.deepEqual(processStepsForService(c,'','social media').map(step=>step.id),['smm-discover','shared-plan']);
-  assert.deepEqual(processStepsForService(c,'smm','paid ads').map(step=>step.id),['shared-plan']);
+  assert.deepEqual(processStepsForService(c,'smm','audit').map(step=>step.id),['smm-discover','shared-plan']);
+  assert.deepEqual(processStepsForService(c,'smm','paid ads'),[]);
   assert.deepEqual(processStepsForService(c,'smm','no matches'),[]);
   assert.deepEqual(experiencesForService(c).map(item=>item.id),['legacy-client','smm-client','shared-client']);
   assert.deepEqual(experiencesForService(c,'ads').map(item=>item.id),['shared-client']);
   c.services[0].title='Renamed social service';
   assert.deepEqual(processStepsForService(c,'smm','renamed').map(step=>step.id),['smm-discover','shared-plan']);
   assert.deepEqual(processStepsForService(c,'smm','social media'),[]);
+  const smm=processWorkflows(c,'smm')[0],ads=processWorkflows(c,'ads')[0];
+  smm.steps[1].description='An independent SMM edit';
+  assert.equal(ads.steps[0].description,'Build a campaign calendar');
+  ads.heading='Advertising workflow';ads.intro='Plan, launch, and refine.';
+  assert.equal(processWorkflows(c,'','Advertising workflow')[0].id,ads.id);
+  assert.equal(processWorkflows(c,'','launch, and refine')[0].id,ads.id);
+  c.services.reverse();
+  assert.deepEqual(processWorkflows(normalizeContent(c),'smm')[0].steps.map(step=>step.id),['smm-discover','shared-plan']);
+});
+
+test('legacy multi-service steps migrate without lost text, collisions, or broken experience links', () => {
+  const before={profile:{},tools:[],services:[{id:'smm',title:'Social Media Management'},{id:'ads',title:'Paid Ads'}],process:{heading:'Original heading',intro:'Original page introduction',steps:[
+    {id:'general',title:'General',description:'General description',icon:'target'},
+    {id:'shared',title:'Shared plan',description:'Original shared text',icon:'layers',serviceIds:['smm','ads']},
+    {id:'shared-ads',title:'Legacy collision',description:'Unassigned text',icon:'target'},
+    {id:'deleted-role',title:'Old role',description:'Keep this old text',icon:'chart',serviceIds:['missing']}
+  ]},experiences:[{id:'client',name:'Client',processStepIds:['shared','deleted-role']}]};
+  const c=normalizeContent(before);
+  assert.deepEqual(c.process.steps.map(step=>step.id),['general','shared-ads','deleted-role']);
+  assert.deepEqual(c.process.workflows.map(workflow=>workflow.serviceId),['smm','ads']);
+  assert.equal(c.process.workflows[0].steps[0].id,'shared');
+  assert.equal(c.process.workflows[1].steps[0].id,'shared-ads-2');
+  assert.deepEqual(c.experiences[0].processStepIds,['shared','shared-ads-2','deleted-role']);
+  assert.ok(allProcessSteps(c).some(step=>step.description==='Original shared text'));
+  assert.equal(new Set(allProcessSteps(c).map(step=>step.id)).size,allProcessSteps(c).length);
+  assert.equal(c.process.heading,before.process.heading);
+  assert.equal(c.process.intro,before.process.intro);
+  assert.deepEqual(normalizeContent(c),c);
+  assert.deepEqual(normalizeContent(before),c);
+  c.process.workflows[0].steps=[];
+  assert.deepEqual(normalizeContent(c).process.workflows[0].steps,[]);
+  c.process.workflows=[];
+  assert.deepEqual(normalizeContent(c).process.workflows,[]);
+  const explicit=normalizeContent({...before,process:{...before.process,workflows:[]}});
+  assert.deepEqual(explicit.process.workflows,[]);
+  assert.equal(explicit.process.steps.length,before.process.steps.length);
 });
 
 test('deleting related content removes only its associations and preserves all other experience data', () => {
@@ -128,13 +168,15 @@ test('deleting related content removes only its associations and preserves all o
   assert.equal(removed.id,'smm');
   assert.deepEqual(c.services.map(row=>row.id),['ads']);
   for(const key of ['portfolio','projects','toolGroups','testimonials','experiences'])assert.ok(c[key].every(row=>!row.serviceIds.includes('smm')));
-  assert.deepEqual(c.process.steps[0].serviceIds,['ads']);
+  assert.deepEqual(c.process.workflows.map(workflow=>workflow.serviceId),['ads']);
+  assert.equal(c.process.workflows[0].steps[0].id,'step-ads');
+  assert.deepEqual(c.experiences[0].processStepIds,['step-ads']);
   assert.deepEqual(c.experiences[0].serviceIds,['ads']);
   assert.equal(c.experiences[0].description,'Keep my work history');
-  for(const [collection,relation] of [['portfolio','portfolioIds'],['projects','projectIds'],['tools','toolIds'],['testimonials','testimonialIds'],['process.steps','processStepIds'],['posts','postIds']]) {
+  for(const [collection,relation] of [['portfolio','portfolioIds'],['projects','projectIds'],['tools','toolIds'],['testimonials','testimonialIds'],['process.workflows.0.steps','processStepIds'],['posts','postIds']]) {
     const content=fixture(),before=structuredClone(content.experiences[0]);
-    removeContentItem(content,collection,0);
-    assert.deepEqual(content.experiences[0],{...before,[relation]:[]});
+    const removed=removeContentItem(content,collection,0);
+    assert.deepEqual(content.experiences[0],{...before,[relation]:before[relation].filter(id=>id!==removed.id)});
     if(collection==='tools')assert.deepEqual(content.toolGroups[0].toolIds,[]);
   }
   const original=structuredClone(c);
@@ -143,4 +185,19 @@ test('deleting related content removes only its associations and preserves all o
   removeContentItem(c,'experiences',0);
   assert.equal(c.experiences.length,0);
   assert.deepEqual(c.portfolio,original.portfolio);
+});
+
+test('workflow and general step deletion clean their own links while orphan workflow steps remain editable', () => {
+  const c=normalizeContent({profile:{},tools:[],services:[{id:'smm',title:'SMM'}],process:{heading:'My Process',intro:'',steps:[{id:'general-step',title:'Discover',description:'General step',icon:'target'}],
+    workflows:[{id:'smm-process',serviceId:'smm',heading:'SMM process',intro:'',steps:[{id:'smm-step',title:'Audit',description:'SMM step',icon:'target'}]},
+      {id:'orphan-process',serviceId:'removed',heading:'Stored old process',intro:'Old information',steps:[{id:'orphan-step',title:'Old work',description:'Keep for editing',icon:'chart'}]}]},
+    experiences:[{id:'client',name:'Client',processStepIds:['general-step','smm-step','orphan-step']}]});
+  assert.deepEqual(processWorkflows(c).map(workflow=>workflow.id),['general','smm-process']);
+  assert.deepEqual(allProcessSteps(c).map(step=>step.id),['general-step','smm-step','orphan-step']);
+  removeContentItem(c,'process.steps',0);
+  assert.deepEqual(c.experiences[0].processStepIds,['smm-step','orphan-step']);
+  removeContentItem(c,'process.workflows',0);
+  assert.deepEqual(c.experiences[0].processStepIds,['orphan-step']);
+  assert.deepEqual(allProcessSteps(c).map(step=>step.id),['orphan-step']);
+  assert.deepEqual(processWorkflows(c),[]);
 });
