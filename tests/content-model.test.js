@@ -1,13 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeContent, toolsForService, testimonialsForService, externalWebsiteUrl} from '../public/content-model.js';
+import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl} from '../public/content-model.js';
 
 test('existing saved content upgrades without mutating text, photos, projects, or posts', () => {
   const before={profile:{name:'Existing owner',photo:'/original.png',linkedin:'https://linkedin.com/in/owner',facebook:'',instagram:''},tools:['Canva','Meta Ads'],services:[{title:'SMM'}],projects:[{title:'Existing project'}],posts:[{title:'Existing blog'}],testimonials:[],faqs:[]};
   const original=structuredClone(before),after=normalizeContent(before);
   assert.deepEqual(before,original);
   assert.deepEqual(after.profile,original.profile);
-  assert.deepEqual(after.projects,original.projects);
+  assert.deepEqual(after.projects,[{...original.projects[0],id:'project-1',serviceIds:[]}]);
   assert.deepEqual(after.posts,original.posts);
   assert.equal(after.tools[0].name,'Canva');
   assert.equal(after.socialLinks[0].url,original.profile.linkedin);
@@ -47,4 +47,26 @@ test('testimonials filter by service, support multiple assignments, and retain l
   assert.deepEqual(testimonialsForService(c,automation),[]);
   c.services.reverse();c.services.find(s=>s.id===smm).title='Renamed SMM service';
   assert.deepEqual(testimonialsForService(normalizeContent(c),smm).map(t=>t.name),['SMM client','Shared client']);
+});
+
+test('service portfolio/project links retain their targets through renames and reordering', () => {
+  const c=normalizeContent({profile:{},tools:[],services:[{title:'SMM',details:''},{title:'Design',details:''}],portfolio:[{title:'Legacy site',url:'https://example.com'}],projects:[{title:'Legacy sample'}],testimonials:[]});
+  const serviceId=c.services[0].id;
+  c.portfolio[0].serviceIds=[serviceId];c.projects[0].serviceIds=[serviceId,c.services[1].id];
+  c.services.reverse();c.services.find(service=>service.id===serviceId).title='Renamed SMM';
+  const after=normalizeContent(c);
+  assert.equal(workForService(after,'portfolio',serviceId)[0].url,'https://example.com');
+  assert.equal(workForService(after,'projects',serviceId)[0].title,'Legacy sample');
+  assert.deepEqual(workForService(after,'portfolio',c.services[0].id),[]);
+  assert.deepEqual(normalizeContent(after),after);
+});
+
+test('new record IDs avoid existing IDs and intentionally deleted process steps stay deleted', () => {
+  const c=normalizeContent({profile:{},tools:[],services:[{title:'Legacy'},{id:'service-1',title:'Existing'}],portfolio:[{title:'Legacy'},{id:'portfolio-1',title:'Existing'}],projects:[{title:'Legacy'},{id:'project-1',title:'Existing'}]});
+  for(const collection of ['services','portfolio','projects'])assert.notEqual(c[collection][0].id,c[collection][1].id);
+  assert.equal(c.process.steps.length,4);
+  assert.deepEqual(normalizeContent(c),c);
+  c.process.steps=[];
+  assert.deepEqual(normalizeContent(c).process.steps,[]);
+  assert.deepEqual(serviceTasks({details:'Content calendars · Reporting\nCustomer engagement\n\n'}),['Content calendars','Reporting','Customer engagement']);
 });

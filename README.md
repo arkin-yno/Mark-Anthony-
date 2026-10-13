@@ -20,6 +20,10 @@ Use the editor to change website text, profile and project photos, contact links
 
 ### New editor sections
 
+**Service pages:** Service cards on Home and Services open a dedicated page. In **Services**, edit the overview, task list, optional cover, and ordered text/image/website blocks. Use **Add portfolio website** or **Add project sample** inside a service to create a linked item, or assign **Related services** on existing Portfolio and Projects entries. Tools and testimonials follow their existing service assignments. Portfolio website links appear below tools on service cards and on the detail page. Links keep their assignments when service names change; deleting a service removes the associated references while preserving the work and reviews.
+
+**My Process:** The sidebar places this page below Testimonials. Its starter layout has four numbered steps (Discover, Plan, Execute, Improve), with cards on desktop and a vertical layout on mobile. Edit the page heading, introduction, step names, descriptions, and icons; add, delete, or reorder steps in the **My Process** editor. The starter copy is a suggested workflow that you can personalize.
+
 - **Portfolio** adds separate website showcases with highlighted names, screenshots, descriptions, and **Visit site** links. The sidebar places Portfolio directly below Home; existing Projects remain intact.
 - **Social links** accepts any platform name and profile URL, with optional custom icons. Links appear in the sidebar and as larger labeled contact buttons. You can reorder or remove them.
 - **About photos** adds pictures separately from your profile photo. Choose left, right, above, or below your biography, set the crop focus, and use the arrows to order photos. On mobile these positions become a vertical layout.
