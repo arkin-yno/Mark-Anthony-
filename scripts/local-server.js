@@ -50,6 +50,8 @@ function validateContent(c) {
   if (!shapeTools(c)) return false;
   if (!['services','portfolio','projects'].every(key=>c[key].every(item=>typeof item?.id==='string' && item.id.length>0) && new Set(c[key].map(item=>item.id)).size===c[key].length)) return false;
   const shape = (rows, fields) => rows.every(r => r && fields.every(k => typeof r[k] === 'string' && r[k].length <= 100000));
+  const ids = value => Array.isArray(value) && value.length<=500 && value.every(id => typeof id==='string' && id.length>0 && id.length<=1000);
+  const uniqueIds = rows => rows.every(row => row.id===undefined || (typeof row.id==='string' && row.id.length>0 && row.id.length<=1000)) && new Set(rows.filter(row=>row.id!==undefined).map(row=>row.id)).size===rows.filter(row=>row.id!==undefined).length;
   if (!shape(c.services,['id','title','category','icon','description','details','overview','image']) || !c.services.every(r => typeof r.featured === 'boolean')) return false;
   const associations = rows => rows.every(item => Array.isArray(item.serviceIds) && item.serviceIds.length<=500 && item.serviceIds.every(id=>typeof id==='string'));
   if (!shape(c.projects,['id','title','description','category','image','url']) || !associations(c.projects)) return false;
@@ -58,8 +60,13 @@ function validateContent(c) {
   if (!shape(c.aboutPhotos,['id','image','caption','placement','focus']) || !c.aboutPhotos.every(p => ['left','right','above','below'].includes(p.placement) && ['center','top','bottom','left','right'].includes(p.focus))) return false;
   if (!shape(c.toolGroups,['id','title']) || !c.toolGroups.every(g => Array.isArray(g.toolIds) && g.toolIds.every(id => typeof id==='string') && Array.isArray(g.serviceIds) && g.serviceIds.every(id => typeof id==='string'))) return false;
   if (!shape(c.testimonials,['name','role','quote','image']) || !c.testimonials.every(t => Array.isArray(t.serviceIds) && t.serviceIds.length<=500 && t.serviceIds.every(id => typeof id==='string'))) return false;
+  if (!uniqueIds(c.testimonials)) return false;
   if (!c.services.every(service => Array.isArray(service.blocks) && service.blocks.length<=500 && shape(service.blocks,['id','type','title','text','image','caption','url']) && service.blocks.every(block=>['text','image','link'].includes(block.type)))) return false;
   if (!c.process || typeof c.process.heading!=='string' || typeof c.process.intro!=='string' || !Array.isArray(c.process.steps) || c.process.steps.length>100 || !shape(c.process.steps,['id','title','description','icon'])) return false;
+  if (!uniqueIds(c.process.steps) || !c.process.steps.every(step => step.serviceIds===undefined || ids(step.serviceIds))) return false;
+  if (c.experiences!==undefined && (!Array.isArray(c.experiences) || c.experiences.length>500 || !shape(c.experiences,['id','name','kind','role','period','location','description','highlights','image','url']) || !uniqueIds(c.experiences) || !c.experiences.every(experience =>
+    ['company','person'].includes(experience.kind) && ['serviceIds','portfolioIds','projectIds','toolIds','testimonialIds','processStepIds','postIds'].every(key => experience[key]===undefined || ids(experience[key])) &&
+    (experience.links===undefined || (Array.isArray(experience.links) && experience.links.length<=100 && shape(experience.links,['label','url']) && uniqueIds(experience.links)))))) return false;
   if (!shape(c.faqs,['question','answer'])) return false;
   if (!shape(c.posts,['id','title','excerpt','date','cover']) || !c.posts.every(p => typeof p.published === 'boolean' && Array.isArray(p.blocks) && shape(p.blocks,['type','text','image','caption']) && p.blocks.every(b => ['text','image'].includes(b.type)))) return false;
   return new Set(c.posts.map(p => p.id)).size === c.posts.length;

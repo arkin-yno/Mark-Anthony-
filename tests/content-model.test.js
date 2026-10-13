@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl} from '../public/content-model.js';
+import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processStepsForService, experiencesForService, removeContentItem} from '../public/content-model.js';
 
 test('existing saved content upgrades without mutating text, photos, projects, or posts', () => {
   const before={profile:{name:'Existing owner',photo:'/original.png',linkedin:'https://linkedin.com/in/owner',facebook:'',instagram:''},tools:['Canva','Meta Ads'],services:[{title:'SMM'}],projects:[{title:'Existing project'}],posts:[{title:'Existing blog'}],testimonials:[],faqs:[]};
@@ -69,4 +69,78 @@ test('new record IDs avoid existing IDs and intentionally deleted process steps 
   c.process.steps=[];
   assert.deepEqual(normalizeContent(c).process.steps,[]);
   assert.deepEqual(serviceTasks({details:'Content calendars · Reporting\nCustomer engagement\n\n'}),['Content calendars','Reporting','Customer engagement']);
+});
+
+test('legacy process, testimonial, and experience records receive stable IDs without overwriting existing data', () => {
+  const before={profile:{},tools:['Canva',{id:'tool-1',name:'Existing tool'}],services:[{id:'smm',title:'SMM'}],testimonials:[{name:'Legacy reviewer',quote:'Original feedback'},{id:'testimonial-1',name:'Existing reviewer'}],
+    process:{heading:'My own process',intro:'Original introduction',steps:[{title:'Legacy discovery',description:'Original step',icon:'target'},{id:'process-1',title:'Existing step',description:'Existing description',icon:'chart'}]},
+    experiences:[{name:'Original client',description:'Original work'},{id:'experience-1',kind:'person',name:'Existing person',serviceIds:['smm'],links:[{label:'Profile',url:'https://example.com'}]}]};
+  const original=structuredClone(before),c=normalizeContent(before);
+  assert.deepEqual(before,original);
+  for(const key of ['tools','testimonials','experiences'])assert.notEqual(c[key][0].id,c[key][1].id);
+  assert.notEqual(c.process.steps[0].id,c.process.steps[1].id);
+  assert.equal(c.process.heading,'My own process');
+  assert.equal(c.process.steps[0].description,'Original step');
+  assert.equal(c.experiences[0].description,'Original work');
+  assert.deepEqual(c.process.steps[0].serviceIds,[]);
+  assert.deepEqual(c.experiences[0].serviceIds,[]);
+  assert.deepEqual(c.experiences[0].postIds,[]);
+  assert.deepEqual(c.experiences[1].links,before.experiences[1].links);
+  assert.deepEqual(normalizeContent(c),c);
+  c.testimonials.reverse();c.process.steps.reverse();c.experiences.reverse();
+  const reordered=normalizeContent(c);
+  assert.equal(reordered.testimonials[1].name,'Legacy reviewer');
+  assert.equal(reordered.process.steps[1].id,c.process.steps[1].id);
+  assert.equal(reordered.experiences[1].id,c.experiences[1].id);
+  c.experiences=[];c.process.steps=[];
+  assert.deepEqual(normalizeContent(c).experiences,[]);
+  assert.deepEqual(normalizeContent(c).process.steps,[]);
+});
+
+test('process search and service filters combine without reordering steps or including unassigned legacy steps', () => {
+  const c=normalizeContent({profile:{},tools:[],services:[{id:'smm',title:'Social Media Management'},{id:'ads',title:'Paid Ads'}],
+    process:{heading:'Process',intro:'',steps:[
+      {id:'legacy',title:'General introduction',description:'Original step',icon:'target'},
+      {id:'smm-discover',title:'Discover',description:'Audit social channels',icon:'target',serviceIds:['smm']},
+      {id:'shared-plan',title:'Plan',description:'Build a campaign calendar',icon:'layers',serviceIds:['smm','ads']},
+      {id:'ads-execute',title:'Execute',description:'Launch paid campaigns',icon:'bolt',serviceIds:['ads']}
+    ]},experiences:[{id:'legacy-client',name:'Legacy client'},{id:'smm-client',name:'SMM client',serviceIds:['smm']},{id:'shared-client',name:'Shared client',serviceIds:['smm','ads']}]});
+  assert.deepEqual(processStepsForService(c).map(step=>step.id),['legacy','smm-discover','shared-plan','ads-execute']);
+  assert.deepEqual(processStepsForService(c,'smm').map(step=>step.id),['smm-discover','shared-plan']);
+  assert.deepEqual(processStepsForService(c,'ads','  CAMPAIGN  ').map(step=>step.id),['shared-plan','ads-execute']);
+  assert.deepEqual(processStepsForService(c,'','social media').map(step=>step.id),['smm-discover','shared-plan']);
+  assert.deepEqual(processStepsForService(c,'smm','paid ads').map(step=>step.id),['shared-plan']);
+  assert.deepEqual(processStepsForService(c,'smm','no matches'),[]);
+  assert.deepEqual(experiencesForService(c).map(item=>item.id),['legacy-client','smm-client','shared-client']);
+  assert.deepEqual(experiencesForService(c,'ads').map(item=>item.id),['shared-client']);
+  c.services[0].title='Renamed social service';
+  assert.deepEqual(processStepsForService(c,'smm','renamed').map(step=>step.id),['smm-discover','shared-plan']);
+  assert.deepEqual(processStepsForService(c,'smm','social media'),[]);
+});
+
+test('deleting related content removes only its associations and preserves all other experience data', () => {
+  const fixture=()=>normalizeContent({profile:{},tools:[{id:'tool',name:'Canva'}],services:[{id:'smm',title:'SMM'},{id:'ads',title:'Ads'}],
+    portfolio:[{id:'website',title:'Website',serviceIds:['smm','ads']}],projects:[{id:'project',title:'Project',serviceIds:['smm']}],
+    testimonials:[{id:'review',name:'Client',serviceIds:['smm','ads']}],posts:[{id:'post',title:'Post'}],toolGroups:[{id:'group',title:'SMM Tools',toolIds:['tool'],serviceIds:['smm','ads']}],
+    process:{heading:'Process',intro:'',steps:[{id:'step',title:'Discover',description:'Audit',icon:'target',serviceIds:['smm','ads']}]},
+    experiences:[{id:'client',name:'Client',description:'Keep my work history',serviceIds:['smm','ads'],portfolioIds:['website'],projectIds:['project'],toolIds:['tool'],testimonialIds:['review'],processStepIds:['step'],postIds:['post'],links:[{label:'Independent link',url:'https://example.com'}]}]});
+  const c=fixture(),removed=removeContentItem(c,'services',0);
+  assert.equal(removed.id,'smm');
+  assert.deepEqual(c.services.map(row=>row.id),['ads']);
+  for(const key of ['portfolio','projects','toolGroups','testimonials','experiences'])assert.ok(c[key].every(row=>!row.serviceIds.includes('smm')));
+  assert.deepEqual(c.process.steps[0].serviceIds,['ads']);
+  assert.deepEqual(c.experiences[0].serviceIds,['ads']);
+  assert.equal(c.experiences[0].description,'Keep my work history');
+  for(const [collection,relation] of [['portfolio','portfolioIds'],['projects','projectIds'],['tools','toolIds'],['testimonials','testimonialIds'],['process.steps','processStepIds'],['posts','postIds']]) {
+    const content=fixture(),before=structuredClone(content.experiences[0]);
+    removeContentItem(content,collection,0);
+    assert.deepEqual(content.experiences[0],{...before,[relation]:[]});
+    if(collection==='tools')assert.deepEqual(content.toolGroups[0].toolIds,[]);
+  }
+  const original=structuredClone(c);
+  for(const index of [-1,1,0.5,NaN])assert.equal(removeContentItem(c,'experiences',index),undefined);
+  assert.deepEqual(c,original);
+  removeContentItem(c,'experiences',0);
+  assert.equal(c.experiences.length,0);
+  assert.deepEqual(c.portfolio,original.portfolio);
 });

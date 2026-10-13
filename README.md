@@ -22,7 +22,9 @@ Use the editor to change website text, profile and project photos, contact links
 
 **Service pages:** Service cards on Home and Services open a dedicated page. In **Services**, edit the overview, task list, optional cover, and ordered text/image/website blocks. Use **Add portfolio website** or **Add project sample** inside a service to create a linked item, or assign **Related services** on existing Portfolio and Projects entries. Tools and testimonials follow their existing service assignments. Portfolio website links appear below tools on service cards and on the detail page. Links keep their assignments when service names change; deleting a service removes the associated references while preserving the work and reviews.
 
-**My Process:** The sidebar places this page below Testimonials. Its starter layout has four numbered steps (Discover, Plan, Execute, Improve), with cards on desktop and a vertical layout on mobile. Edit the page heading, introduction, step names, descriptions, and icons; add, delete, or reorder steps in the **My Process** editor. The starter copy is a suggested workflow that you can personalize.
+**My Process:** The sidebar places this page below Testimonials. Its starter layout has four numbered steps (Discover, Plan, Execute, Improve), with cards on desktop and a vertical layout on mobile. Visitors can search steps and filter them by service. Edit the page heading, introduction, step names, descriptions, and icons; add, delete, or reorder steps in the **My Process** editor, and choose the services each step relates to. Unassigned steps remain visible in the complete list. The starter copy is a suggested workflow that you can personalize.
+
+**My Experience:** Add companies or people you have worked with, including a photo or logo, your role, dates, an overview, and highlights. Each experience card opens a page with more information and related work. In the editor, link an experience to services, portfolio websites, projects, tools, testimonials, process steps, and blog posts, or add labeled website URLs. The linked sections reuse their original content, and matching services show the related experience so visitors can browse in either direction. Deleting linked content removes its references without deleting the experience or other collections. Experience starts empty; add only your own work history.
 
 - **Portfolio** adds separate website showcases with highlighted names, screenshots, descriptions, and **Visit site** links. The sidebar places Portfolio directly below Home; existing Projects remain intact.
 - **Social links** accepts any platform name and profile URL, with optional custom icons. Links appear in the sidebar and as larger labeled contact buttons. You can reorder or remove them.
@@ -32,7 +34,7 @@ Use the editor to change website text, profile and project photos, contact links
 
 Older saved content is upgraded in memory without modifying the database. Saving in the editor stores the new fields; no SQL rerun is required. All original profile content, projects, and blog posts are retained. Photo and logo uploads accept PNG, JPG, WebP, or GIF up to 3 MB.
 
-The name and initial tool list are editable starter content. Projects, testimonials, and blog posts start empty so no client results or endorsements are invented. Add your email or booking URL under **Photos & contact** to enable contact actions. Blog post text is plain text with preserved paragraphs.
+The name and initial tool list are editable starter content. Projects, testimonials, experience entries, and blog posts start empty so no client results or endorsements are invented. Add your email or booking URL under **Photos & contact** to enable contact actions. Blog post text is plain text with preserved paragraphs.
 
 ## Online hosting with Vercel and Supabase
 

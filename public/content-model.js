@@ -3,13 +3,13 @@
 export function normalizeContent(input) {
   const c = structuredClone(input);
   if (!c || typeof c !== 'object') return c;
-  if (Array.isArray(c.tools)) c.tools = c.tools.map((tool, i) =>
+  if (Array.isArray(c.tools)) c.tools = collectionWithIds(c.tools.map(tool =>
     typeof tool === 'string'
-      ? { id: `tool-${i + 1}`, name: tool, logo: '', description: '', url: '' }
-      : { id: `tool-${i + 1}`, logo: '', description: '', url: '', ...tool });
+      ? { name: tool, logo: '', description: '', url: '' }
+      : { logo: '', description: '', url: '', ...tool }), 'tool');
   if (Array.isArray(c.services)) c.services = collectionWithIds(c.services, 'service')
     .map(service => ({ overview: '', image: '', blocks: [], ...service }));
-  if (Array.isArray(c.testimonials)) c.testimonials = c.testimonials.map(testimonial =>
+  if (Array.isArray(c.testimonials)) c.testimonials = collectionWithIds(c.testimonials, 'testimonial').map(testimonial =>
     ({ ...testimonial, serviceIds: testimonial.serviceIds ?? [] }));
   c.portfolio ??= [];
   if (Array.isArray(c.portfolio)) c.portfolio = collectionWithIds(c.portfolio, 'portfolio')
@@ -24,6 +24,12 @@ export function normalizeContent(input) {
     .filter(name => c.profile?.[name])
     .map(name => ({ id: `social-${name}`, label: { linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram' }[name], url: c.profile[name], logo: '' }));
   c.process ??= structuredClone(starterProcess);
+  if (Array.isArray(c.process.steps)) c.process.steps = collectionWithIds(c.process.steps, 'process')
+    .map(step => ({ serviceIds: [], ...step }));
+  c.experiences ??= [];
+  if (Array.isArray(c.experiences)) c.experiences = collectionWithIds(c.experiences, 'experience')
+    .map(item => ({ name: '', kind: 'company', role: '', period: '', location: '', description: '', highlights: '', image: '', url: '',
+      serviceIds: [], portfolioIds: [], projectIds: [], toolIds: [], testimonialIds: [], processStepIds: [], postIds: [], links: [], ...item }));
   return c;
 }
 
@@ -65,6 +71,46 @@ export function testimonialsForService(content, serviceId = '') {
 
 export function workForService(content, collection, serviceId) {
   return content[collection].filter(item => item.serviceIds.includes(serviceId));
+}
+
+export function processStepsForService(content, serviceId = '', query = '') {
+  const search = String(query).trim().toLocaleLowerCase();
+  return content.process.steps.filter(step => {
+    if (serviceId && !step.serviceIds.includes(serviceId)) return false;
+    if (!search) return true;
+    const services = content.services.filter(service => step.serviceIds.includes(service.id));
+    return [step.title, step.description, ...services.map(service => service.title)]
+      .join(' ').toLocaleLowerCase().includes(search);
+  });
+}
+
+export function experiencesForService(content, serviceId = '') {
+  return serviceId
+    ? content.experiences.filter(experience => experience.serviceIds.includes(serviceId))
+    : content.experiences;
+}
+
+// Remove the record and its connections together so renaming/reordering never
+// turns a saved association into a link to a different item.
+export function removeContentItem(content, collection, index) {
+  const rows = collection === 'process.steps' ? content.process?.steps : content[collection];
+  if (!Array.isArray(rows) || !Number.isInteger(index) || index < 0 || index >= rows.length) return;
+  const [removed] = rows.splice(index, 1);
+  if (!removed?.id) return removed;
+  const unlink = (items, key) => {
+    if (Array.isArray(items)) items.forEach(item => {
+      if (Array.isArray(item[key])) item[key] = item[key].filter(id => id !== removed.id);
+    });
+  };
+  if (collection === 'services') {
+    for (const key of ['portfolio', 'projects', 'toolGroups', 'testimonials', 'experiences']) unlink(content[key], 'serviceIds');
+    unlink(content.process?.steps, 'serviceIds');
+  }
+  if (collection === 'tools') unlink(content.toolGroups, 'toolIds');
+  const relation = { services: 'serviceIds', portfolio: 'portfolioIds', projects: 'projectIds', tools: 'toolIds',
+    testimonials: 'testimonialIds', 'process.steps': 'processStepIds', posts: 'postIds' }[collection];
+  if (relation) unlink(content.experiences, relation);
+  return removed;
 }
 
 export function serviceTasks(service) {
