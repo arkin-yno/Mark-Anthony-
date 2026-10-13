@@ -9,6 +9,8 @@ export function normalizeContent(input) {
       : { id: `tool-${i + 1}`, logo: '', description: '', url: '', ...tool });
   if (Array.isArray(c.services)) c.services = c.services.map((service, i) =>
     ({ id: `service-${i + 1}`, ...service }));
+  if (Array.isArray(c.testimonials)) c.testimonials = c.testimonials.map(testimonial =>
+    ({ ...testimonial, serviceIds: testimonial.serviceIds ?? [] }));
   c.portfolio ??= [];
   c.aboutPhotos ??= [];
   c.toolGroups ??= [];
@@ -25,6 +27,12 @@ export function toolsForService(content, serviceId) {
     .filter(group => group.serviceIds.includes(serviceId))
     .flatMap(group => group.toolIds));
   return content.tools.filter(tool => ids.has(tool.id));
+}
+
+export function testimonialsForService(content, serviceId = '') {
+  return serviceId
+    ? content.testimonials.filter(testimonial => testimonial.serviceIds.includes(serviceId))
+    : content.testimonials;
 }
 
 export function externalWebsiteUrl(value) {

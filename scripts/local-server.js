@@ -55,7 +55,7 @@ function validateContent(c) {
   if (!shape(c.socialLinks,['id','label','url','logo'])) return false;
   if (!shape(c.aboutPhotos,['id','image','caption','placement','focus']) || !c.aboutPhotos.every(p => ['left','right','above','below'].includes(p.placement) && ['center','top','bottom','left','right'].includes(p.focus))) return false;
   if (!shape(c.toolGroups,['id','title']) || !c.toolGroups.every(g => Array.isArray(g.toolIds) && g.toolIds.every(id => typeof id==='string') && Array.isArray(g.serviceIds) && g.serviceIds.every(id => typeof id==='string'))) return false;
-  if (!shape(c.testimonials,['name','role','quote','image'])) return false;
+  if (!shape(c.testimonials,['name','role','quote','image']) || !c.testimonials.every(t => Array.isArray(t.serviceIds) && t.serviceIds.length<=500 && t.serviceIds.every(id => typeof id==='string'))) return false;
   if (!shape(c.faqs,['question','answer'])) return false;
   if (!shape(c.posts,['id','title','excerpt','date','cover']) || !c.posts.every(p => typeof p.published === 'boolean' && Array.isArray(p.blocks) && shape(p.blocks,['type','text','image','caption']) && p.blocks.every(b => ['text','image'].includes(b.type)))) return false;
   return new Set(c.posts.map(p => p.id)).size === c.posts.length;

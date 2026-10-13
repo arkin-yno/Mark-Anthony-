@@ -28,12 +28,15 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];
     assert.match(login.headers.get('set-cookie'),/HttpOnly/);
     const c=structuredClone(defaultContent); c.profile.headline='Persisted headline';
+    c.testimonials=[{name:'Service client',role:'Owner',quote:'A real review fixture',image:'',serviceIds:[c.services[0].id,c.services[1].id]}];
     c.posts=[{id:'draft',title:'Private draft',excerpt:'',date:'2026-10-13',cover:'',published:false,blocks:[]},{id:'live',title:'Published story',excerpt:'A story',date:'2026-10-13',cover:'',published:true,blocks:[{type:'text',text:'Hello reader',image:'',caption:''}]}];
     assert.equal((await req('/api/admin/content','PUT',c,{Origin:'https://other.example'})).status,403);
     assert.equal((await req('/api/admin/content','PUT',{...c,services:[{}]})).status,400);
+    assert.equal((await req('/api/admin/content','PUT',{...c,testimonials:[{...c.testimonials[0],serviceIds:'invalid'}]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',c)).status,200);
     const pub=await (await req('/api/content')).json();
     assert.equal(pub.profile.headline,'Persisted headline');assert.deepEqual(pub.posts.map(p=>p.id),['live']);
+    assert.deepEqual(pub.testimonials[0].serviceIds,c.testimonials[0].serviceIds);
     assert.equal((await (await req('/api/admin/content')).json()).posts.length,2);
     assert.equal((await req('/api/admin/upload','POST',{data:Buffer.from('<svg onload="alert(1)"></svg>').toString('base64')})).status,400);
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY1cAAAAASUVORK5CYII=';
@@ -43,6 +46,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     for(const p of ['/','#admin','/services','/styles.css','/app.js'])assert.equal((await req(p)).status,200);
     await stop();await start();cookie='';
     assert.equal((await (await req('/api/content')).json()).profile.headline,'Persisted headline');
+    assert.deepEqual((await (await req('/api/content')).json()).testimonials[0].serviceIds,c.testimonials[0].serviceIds);
     const again=await req('/api/login','POST',{password});cookie=again.headers.get('set-cookie').split(';')[0];
     const newPassword='A-long-test-password-4826';
     assert.equal((await req('/api/admin/password','POST',{password:newPassword})).status,200);
