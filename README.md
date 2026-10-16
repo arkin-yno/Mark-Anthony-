@@ -1,6 +1,8 @@
 # Mark Anthony portfolio
 
-A responsive navy portfolio with sidebar navigation and a private content editor. Built with Node.js and browser JavaScript; no third-party runtime packages are required. The Vercel build command validates deployment files.
+A responsive navy portfolio with continuous scrolling, sidebar navigation, and a private content editor. Built with Node.js and browser JavaScript; no third-party runtime packages are required. The Vercel build command validates deployment files.
+
+The main website flows vertically from Home to Portfolio and through every section to FAQs & contact. Sidebar buttons jump to the matching section, and the active button follows visitors as they scroll. Direct section links still work. Service details, individual blog posts, and experience details retain their own views, with links back to the corresponding section.
 
 ## Run
 
@@ -19,6 +21,8 @@ Choose **Manage website** at the bottom of the sidebar to open the private admin
 Use the editor to change website text, profile and project photos, contact links, services, tools, FAQs, and testimonials. Blog posts support ordered text and image blocks, cover images, captions, drafts, publishing, and unpublishing. **Preview** shows unsaved content; **Save changes** applies website edits and published posts to the public site. Uploaded images become public files, so do not upload confidential pictures. Removing a picture from content removes its reference, while the stored upload remains available for other uses.
 
 ### New editor sections
+
+**Gallery:** Upload photos and add a title and caption, then reorder or remove entries. Photos appear in Gallery and can also be displayed in selected website sections or attached to specific blog posts, portfolio websites, services, projects, and experience entries. Choose placements in each photo's editor. Existing photo and logo fields also offer **Choose from Gallery**, so one uploaded picture can be reused throughout the site. Removing a Gallery entry removes its Gallery placements; photos already chosen in other image fields remain in those fields. Upload files remain stored for reuse. No SQL rerun is required.
 
 **Service pages:** Service cards on Home and Services open a dedicated page. In **Services**, edit the overview, task list, optional cover, and ordered text/image/website blocks. Use **Add portfolio website** or **Add project sample** inside a service to create a linked item, or assign **Related services** on existing Portfolio and Projects entries. Tools and testimonials follow their existing service assignments. Portfolio website links appear below tools on service cards and on the detail page. Links keep their assignments when service names change; deleting a service removes the associated references while preserving the work and reviews.
 

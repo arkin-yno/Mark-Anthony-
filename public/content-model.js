@@ -64,6 +64,16 @@ export function normalizeContent(input) {
   if (migratedStepIds.size && Array.isArray(c.experiences)) c.experiences.forEach(item => {
     if (Array.isArray(item.processStepIds)) item.processStepIds = [...new Set(item.processStepIds.flatMap(id => migratedStepIds.get(id) || [id]))];
   });
+  if (c.gallery === undefined) c.gallery = [];
+  if (Array.isArray(c.gallery)) {
+    const storedGallery = c.gallery;
+    c.gallery = collectionWithIds(storedGallery, 'gallery').map((item, index) =>
+      storedGallery[index] && typeof storedGallery[index] === 'object' && !Array.isArray(storedGallery[index])
+        ? { title: '', caption: '', image: '', sectionIds: [], serviceIds: [], portfolioIds: [], projectIds: [],
+          postIds: [], experienceIds: [], toolIds: [], processIds: [], ...item,
+          ...(Object.hasOwn(storedGallery[index], 'id') ? { id: storedGallery[index].id } : {}) }
+        : storedGallery[index]);
+  }
   return c;
 }
 
@@ -136,6 +146,23 @@ export function experiencesForService(content, serviceId = '') {
     : content.experiences;
 }
 
+const galleryRelations = { services: 'serviceIds', portfolio: 'portfolioIds', projects: 'projectIds', posts: 'postIds',
+  experiences: 'experienceIds', tools: 'toolIds', 'process.workflows': 'processIds', 'process.general': 'processIds' };
+
+export function galleryForSection(content, section) {
+  return section && Array.isArray(content.gallery)
+    ? content.gallery.filter(item => typeof item?.image === 'string' && item.image.trim() && Array.isArray(item.sectionIds) && item.sectionIds.includes(section))
+    : [];
+}
+
+export function galleryForRecord(content, collection, id) {
+  const relation = galleryRelations[collection];
+  const target = collection === 'process.general' ? 'general' : id;
+  return id && relation && Array.isArray(content.gallery)
+    ? content.gallery.filter(item => typeof item?.image === 'string' && item.image.trim() && Array.isArray(item[relation]) && item[relation].includes(target))
+    : [];
+}
+
 // Remove the record and its connections together so renaming/reordering never
 // turns a saved association into a link to a different item.
 export function removeContentItem(content, collection, index) {
@@ -155,9 +182,11 @@ export function removeContentItem(content, collection, index) {
     for (const key of ['portfolio', 'projects', 'toolGroups', 'testimonials', 'experiences']) unlink(content[key], 'serviceIds');
     unlink(content.process?.steps, 'serviceIds');
     if (Array.isArray(content.process?.workflows)) {
-      const removedSteps = new Set(content.process.workflows.filter(workflow => workflow.serviceId === removed.id).flatMap(workflow => workflow.steps.map(step => step.id)));
+      const removedWorkflows = content.process.workflows.filter(workflow => workflow.serviceId === removed.id);
+      const removedSteps = new Set(removedWorkflows.flatMap(workflow => workflow.steps.map(step => step.id)));
       content.process.workflows = content.process.workflows.filter(workflow => workflow.serviceId !== removed.id);
       unlink(content.experiences, 'processStepIds', removedSteps);
+      unlink(content.gallery, 'processIds', new Set(removedWorkflows.map(workflow => workflow.id)));
     }
   }
   if (collection === 'process.workflows') unlink(content.experiences, 'processStepIds', new Set(removed.steps.map(step => step.id)));
@@ -166,6 +195,8 @@ export function removeContentItem(content, collection, index) {
   const relation = { services: 'serviceIds', portfolio: 'portfolioIds', projects: 'projectIds', tools: 'toolIds',
     testimonials: 'testimonialIds', 'process.steps': 'processStepIds', posts: 'postIds' }[collection];
   if (relation) unlink(content.experiences, relation);
+  const galleryRelation = galleryRelations[collection];
+  if (galleryRelation) unlink(content.gallery, galleryRelation);
   return removed;
 }
 

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processWorkflows, processStepsForService, allProcessSteps, experiencesForService, removeContentItem} from '../public/content-model.js';
+import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processWorkflows, processStepsForService, allProcessSteps, experiencesForService, removeContentItem, galleryForSection, galleryForRecord} from '../public/content-model.js';
 
 test('existing saved content upgrades without mutating text, photos, projects, or posts', () => {
   const before={profile:{name:'Existing owner',photo:'/original.png',linkedin:'https://linkedin.com/in/owner',facebook:'',instagram:''},tools:['Canva','Meta Ads'],services:[{title:'SMM'}],projects:[{title:'Existing project'}],posts:[{title:'Existing blog'}],testimonials:[],faqs:[]};
@@ -13,6 +13,7 @@ test('existing saved content upgrades without mutating text, photos, projects, o
   assert.equal(after.socialLinks[0].url,original.profile.linkedin);
   assert.deepEqual(after.portfolio,[]);
   assert.deepEqual(after.aboutPhotos,[]);
+  assert.deepEqual(after.gallery,[]);
   assert.deepEqual(normalizeContent(after),after);
 });
 
@@ -200,4 +201,78 @@ test('workflow and general step deletion clean their own links while orphan work
   assert.deepEqual(c.experiences[0].processStepIds,['orphan-step']);
   assert.deepEqual(allProcessSteps(c).map(step=>step.id),['orphan-step']);
   assert.deepEqual(processWorkflows(c),[]);
+});
+
+test('gallery normalization retains original text, images and associations with stable collision-free IDs', () => {
+  const before={profile:{photo:'/original-photo.png'},services:[],gallery:[
+    {title:'My original title',caption:'My original caption',image:'/uploads/original.png',sectionIds:['home','blog'],postIds:['story']},
+    {id:'gallery-1',title:'Already saved',caption:'Keep every word',image:'https://example.com/saved.jpg',serviceIds:['smm']}
+  ]};
+  const original=structuredClone(before),c=normalizeContent(before);
+  assert.deepEqual(before,original);
+  assert.equal(c.gallery[0].title,before.gallery[0].title);
+  assert.equal(c.gallery[0].caption,before.gallery[0].caption);
+  assert.equal(c.gallery[0].image,before.gallery[0].image);
+  assert.deepEqual(c.gallery[0].sectionIds,before.gallery[0].sectionIds);
+  assert.deepEqual(c.gallery[0].postIds,['story']);
+  assert.notEqual(c.gallery[0].id,c.gallery[1].id);
+  assert.deepEqual(c.gallery[0].portfolioIds,[]);
+  assert.deepEqual(normalizeContent(c),c);
+  const originalId=c.gallery[0].id;
+  c.gallery.reverse();c.gallery[1].title='Renamed photo';
+  assert.equal(normalizeContent(c).gallery[1].id,originalId);
+  c.gallery=[];
+  assert.deepEqual(normalizeContent(c).gallery,[]);
+  for(const invalid of [null,'invalid',{},[null],[false],[[]]])assert.deepEqual(normalizeContent({gallery:invalid}).gallery,invalid);
+  assert.equal(normalizeContent({gallery:[{serviceIds:null}]}).gallery[0].serviceIds,null);
+  for(const id of [null,3,''])assert.equal(normalizeContent({gallery:[{id}]}).gallery[0].id,id);
+});
+
+test('gallery placements resolve exact sections and record IDs and exclude empty images', () => {
+  const c=normalizeContent({services:[],gallery:[
+    {id:'shared',image:'/uploads/shared.png',sectionIds:['home','blog'],serviceIds:['smm'],portfolioIds:['site'],projectIds:['sample'],postIds:['story'],experienceIds:['company'],toolIds:['canva'],processIds:['smm-workflow','general']},
+    {id:'unassigned',image:'/uploads/another.png'},
+    {id:'blank',image:'  ',sectionIds:['home'],serviceIds:['smm']}
+  ]});
+  assert.deepEqual(galleryForSection(c,'home').map(item=>item.id),['shared']);
+  assert.deepEqual(galleryForSection(c,'blog').map(item=>item.id),['shared']);
+  assert.deepEqual(galleryForSection(c,'services'),[]);
+  assert.deepEqual(galleryForSection(c,''),[]);
+  for(const [collection,id] of [['services','smm'],['portfolio','site'],['projects','sample'],['posts','story'],['experiences','company'],['tools','canva'],['process.workflows','smm-workflow'],['process.workflows','general'],['process.general','general']]) {
+    assert.deepEqual(galleryForRecord(c,collection,id).map(item=>item.id),['shared']);
+    assert.deepEqual(galleryForRecord(c,collection,''),[]);
+    if(collection!=='process.general')assert.deepEqual(galleryForRecord(c,collection,'unrelated'),[]);
+  }
+  assert.deepEqual(galleryForRecord(c,'unrecognized','smm'),[]);
+  assert.deepEqual(galleryForSection({},'home'),[]);
+  assert.deepEqual(galleryForRecord({},'services','smm'),[]);
+});
+
+test('deleting gallery targets only unlinks the removed IDs and never removes shared pictures', () => {
+  const fixture=()=>normalizeContent({profile:{photo:'/uploads/shared.png'},services:[{id:'smm',title:'SMM'},{id:'ads',title:'Ads'}],
+    portfolio:[{id:'site',title:'Website',image:'/uploads/shared.png'}],projects:[{id:'sample',title:'Sample'}],posts:[{id:'story',title:'Story',cover:'/uploads/shared.png'}],tools:[{id:'canva',name:'Canva'}],
+    experiences:[{id:'company',name:'Company'}],process:{heading:'My Process',intro:'',steps:[{id:'general-step',title:'General',description:'General',icon:'target'}],
+      workflows:[{id:'smm-workflow',serviceId:'smm',steps:[{id:'smm-step',title:'Audit',description:'Audit',icon:'target'}]},
+        {id:'ads-workflow',serviceId:'ads',steps:[{id:'ads-step',title:'Launch',description:'Launch',icon:'target'}]}]},
+    gallery:[{id:'photo',title:'Photo',caption:'Keep this caption',image:'/uploads/shared.png',sectionIds:['home'],serviceIds:['smm','ads'],portfolioIds:['site'],projectIds:['sample'],postIds:['story'],experienceIds:['company'],toolIds:['canva'],processIds:['general','smm-workflow','ads-workflow']}]});
+  for(const [collection,relation] of [['portfolio','portfolioIds'],['projects','projectIds'],['posts','postIds'],['experiences','experienceIds'],['tools','toolIds'],['process.workflows','processIds']]) {
+    const c=fixture(),before=structuredClone(c.gallery[0]);
+    const removed=removeContentItem(c,collection,0);
+    assert.deepEqual(c.gallery[0],{...before,[relation]:before[relation].filter(id=>id!==removed.id)});
+  }
+  const c=fixture();
+  removeContentItem(c,'process.workflows.0.steps',0);
+  removeContentItem(c,'process.steps',0);
+  assert.deepEqual(c.gallery[0].processIds,['general','smm-workflow','ads-workflow']);
+  removeContentItem(c,'services',0);
+  assert.deepEqual(c.gallery[0].serviceIds,['ads']);
+  assert.deepEqual(c.gallery[0].processIds,['general','ads-workflow']);
+  assert.equal(c.gallery[0].caption,'Keep this caption');
+  const unrelated=structuredClone(c);delete unrelated.gallery;
+  removeContentItem(c,'gallery',0);
+  const actual=structuredClone(c);delete actual.gallery;
+  assert.deepEqual(actual,unrelated);
+  assert.equal(c.profile.photo,'/uploads/shared.png');
+  assert.equal(c.portfolio[0].image,'/uploads/shared.png');
+  assert.equal(c.posts[0].cover,'/uploads/shared.png');
 });

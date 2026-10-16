@@ -38,6 +38,8 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     c.experiences=[{id:'client-experience',name:'Example company',kind:'company',role:'Marketing support',period:'2024–2025',location:'Remote',description:'Work history',highlights:'Campaign planning',image:'',url:'https://example.com',
       serviceIds:[c.services[0].id],portfolioIds:['website'],projectIds:['sample'],toolIds:[c.tools[0].id],testimonialIds:['testimonial-1'],processStepIds:['smm-audit'],postIds:['live'],links:[{id:'company-link',label:'Company website',url:'https://example.com'}]}];
     c.posts=[{id:'draft',title:'Private draft',excerpt:'',date:'2026-10-13',cover:'',published:false,blocks:[]},{id:'live',title:'Published story',excerpt:'A story',date:'2026-10-13',cover:'',published:true,blocks:[{type:'text',text:'Hello reader',image:'',caption:''}]}];
+    c.gallery=[{id:'shared-photo',title:'Campaign photo',caption:'My original caption',image:'/uploads/example.png',sectionIds:['home','portfolio','blog'],
+      serviceIds:[c.services[0].id],portfolioIds:['website'],projectIds:['sample'],postIds:['live'],experienceIds:['client-experience'],toolIds:[c.tools[0].id],processIds:['general','smm-process']}];
     assert.equal((await req('/api/admin/content','PUT',c,{Origin:'https://other.example'})).status,403);
     assert.equal((await req('/api/admin/content','PUT',{...c,services:[{}]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,testimonials:[{...c.testimonials[0],serviceIds:'invalid'}]})).status,400);
@@ -59,8 +61,21 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.equal((await req('/api/admin/content','PUT',{...c,experiences:[{...c.experiences[0],links:'invalid'}]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,experiences:[{...c.experiences[0],links:[{label:'Missing URL'}]}]})).status,400);
     assert.equal((await req('/api/admin/content','PUT',{...c,portfolio:[c.portfolio[0],c.portfolio[0]]})).status,400);
-    const legacy=structuredClone(c);delete legacy.experiences;delete legacy.process.workflows;legacy.process.steps.forEach(step=>delete step.serviceIds);
+    for(const gallery of [null,'invalid',{},[null],[[]],[false],[c.gallery[0],c.gallery[0]],
+      [{...c.gallery[0],title:3}],[{...c.gallery[0],caption:null}],[{...c.gallery[0],image:[]}],
+      [{...c.gallery[0],id:null}],[{...c.gallery[0],id:3}],[{...c.gallery[0],id:''}],
+      [{...c.gallery[0],caption:'x'.repeat(100001)}],[{...c.gallery[0],sectionIds:['unknown-section']}],
+      Array.from({length:501},(_,i)=>({...c.gallery[0],id:'photo-'+i}))]) {
+      assert.equal((await req('/api/admin/content','PUT',{...c,gallery})).status,400,'Reject malformed gallery content');
+    }
+    for(const relation of ['sectionIds','serviceIds','portfolioIds','projectIds','postIds','experienceIds','toolIds','processIds']) {
+      for(const invalid of ['invalid',null,[''],[false],Array.from({length:501},()=> 'target')]) {
+        assert.equal((await req('/api/admin/content','PUT',{...c,gallery:[{...c.gallery[0],[relation]:invalid}]})).status,400,'Reject malformed gallery '+relation);
+      }
+    }
+    const legacy=structuredClone(c);delete legacy.experiences;delete legacy.gallery;delete legacy.process.workflows;legacy.process.steps.forEach(step=>delete step.serviceIds);
     assert.equal((await req('/api/admin/content','PUT',legacy)).status,200);
+    assert.deepEqual((await (await req('/api/content')).json()).gallery,[]);
     assert.equal((await req('/api/admin/content','PUT',c)).status,200);
     const pub=await (await req('/api/content')).json();
     assert.equal(pub.profile.headline,'Persisted headline');assert.deepEqual(pub.posts.map(p=>p.id),['live']);
@@ -69,11 +84,20 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.deepEqual(pub.services[0].blocks,c.services[0].blocks);
     assert.deepEqual(pub.experiences,c.experiences);
     assert.deepEqual(pub.process.workflows,c.process.workflows);
+    assert.deepEqual(pub.gallery,c.gallery);
+    assert.equal((await req('/api/admin/content','PUT',{...c,gallery:[{...c.gallery[0],sectionIds:['bad']}]})).status,400);
+    assert.deepEqual((await (await req('/api/admin/content')).json()).gallery,c.gallery);
     assert.equal((await (await req('/api/admin/content')).json()).posts.length,2);
     assert.equal((await req('/api/admin/upload','POST',{data:Buffer.from('<svg onload="alert(1)"></svg>').toString('base64')})).status,400);
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY1cAAAAASUVORK5CYII=';
     const upload=await req('/api/admin/upload','POST',{data:png});assert.equal(upload.status,201);
     const image=await upload.json();const response=await req(image.url);assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/png');
+    c.gallery[0].image=image.url;c.portfolio[0].image=image.url;
+    assert.equal((await req('/api/admin/content','PUT',c)).status,200);
+    assert.equal((await req('/api/admin/content','PUT',{...c,gallery:[]})).status,200);
+    assert.equal((await req(image.url)).status,200,'Removing a gallery entry retains the uploaded file');
+    assert.equal((await (await req('/api/content')).json()).portfolio[0].image,image.url);
+    assert.equal((await req('/api/admin/content','PUT',c)).status,200);
     assert.equal((await req('/uploads/not-valid.png')).status,404);
     for(const p of ['/','#admin','/services','/styles.css','/app.js'])assert.equal((await req(p)).status,200);
     await stop();await start();cookie='';
@@ -84,6 +108,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.equal(restored.process.steps[0].title,'My discovery step');
     assert.deepEqual(restored.process.workflows,c.process.workflows);
     assert.deepEqual(restored.experiences,c.experiences);
+    assert.deepEqual(restored.gallery,c.gallery);
     const again=await req('/api/login','POST',{password});cookie=again.headers.get('set-cookie').split(';')[0];
     const newPassword='A-long-test-password-4826';
     assert.equal((await req('/api/admin/password','POST',{password:newPassword})).status,200);

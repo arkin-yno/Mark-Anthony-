@@ -69,6 +69,10 @@ function validateContent(c) {
   if (c.experiences!==undefined && (!Array.isArray(c.experiences) || c.experiences.length>500 || !shape(c.experiences,['id','name','kind','role','period','location','description','highlights','image','url']) || !uniqueIds(c.experiences) || !c.experiences.every(experience =>
     ['company','person'].includes(experience.kind) && ['serviceIds','portfolioIds','projectIds','toolIds','testimonialIds','processStepIds','postIds'].every(key => experience[key]===undefined || ids(experience[key])) &&
     (experience.links===undefined || (Array.isArray(experience.links) && experience.links.length<=100 && shape(experience.links,['label','url']) && uniqueIds(experience.links)))))) return false;
+  const gallerySections = ['home','portfolio','services','projects','about','experience','tools','testimonials','process','blog','contact'];
+  if (!Array.isArray(c.gallery) || c.gallery.length>500 || !shape(c.gallery,['id','title','caption','image']) || !uniqueIds(c.gallery) || !c.gallery.every(item =>
+    ['sectionIds','serviceIds','portfolioIds','projectIds','postIds','experienceIds','toolIds','processIds'].every(key => ids(item[key])) &&
+    item.sectionIds.every(section => gallerySections.includes(section)))) return false;
   if (!shape(c.faqs,['question','answer'])) return false;
   if (!shape(c.posts,['id','title','excerpt','date','cover']) || !c.posts.every(p => typeof p.published === 'boolean' && Array.isArray(p.blocks) && shape(p.blocks,['type','text','image','caption']) && p.blocks.every(b => ['text','image'].includes(b.type)))) return false;
   return new Set(c.posts.map(p => p.id)).size === c.posts.length;
