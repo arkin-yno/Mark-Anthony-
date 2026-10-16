@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processWorkflows, processStepsForService, allProcessSteps, experiencesForService, removeContentItem, galleryForSection, galleryForRecord} from '../public/content-model.js';
+import {normalizeContent, toolsForService, testimonialsForService, workForService, serviceTasks, externalWebsiteUrl, processWorkflows, processStepsForService, allProcessSteps, experiencesForService, removeContentItem, galleryForSection, galleryForRecord, galleryAlbumPictures, galleryAlbumCover} from '../public/content-model.js';
 
 test('existing saved content upgrades without mutating text, photos, projects, or posts', () => {
   const before={profile:{name:'Existing owner',photo:'/original.png',linkedin:'https://linkedin.com/in/owner',facebook:'',instagram:''},tools:['Canva','Meta Ads'],services:[{title:'SMM'}],projects:[{title:'Existing project'}],posts:[{title:'Existing blog'}],testimonials:[],faqs:[]};
@@ -14,6 +14,7 @@ test('existing saved content upgrades without mutating text, photos, projects, o
   assert.deepEqual(after.portfolio,[]);
   assert.deepEqual(after.aboutPhotos,[]);
   assert.deepEqual(after.gallery,[]);
+  assert.deepEqual(after.galleryAlbums,[]);
   assert.deepEqual(normalizeContent(after),after);
 });
 
@@ -275,4 +276,77 @@ test('deleting gallery targets only unlinks the removed IDs and never removes sh
   assert.equal(c.profile.photo,'/uploads/shared.png');
   assert.equal(c.portfolio[0].image,'/uploads/shared.png');
   assert.equal(c.posts[0].cover,'/uploads/shared.png');
+});
+
+test('gallery albums preserve legacy unfiled photos and stable associations through renaming and reordering', () => {
+  const before={gallery:[{title:'Legacy photo',caption:'Original caption',image:'/original.png',sectionIds:['home'],postIds:['story']},
+    {id:'photo-a',title:'First album photo',caption:'Keep this text',image:'/a.png',albumId:'gallery-album-1'},
+    {id:'photo-b',title:'Second album photo',image:'/b.png',albumId:'gallery-album-1'},
+    {id:'orphan',image:'/old.png',albumId:'removed-album'},
+    {id:'empty',image:'  ',albumId:'gallery-album-1'}],galleryAlbums:[{title:'Legacy album'}, {id:'gallery-album-1',title:'Saved album',description:'My album description',coverId:'photo-b'}]};
+  const original=structuredClone(before),c=normalizeContent(before);
+  assert.deepEqual(before,original);
+  assert.equal(c.gallery[0].albumId,'');
+  assert.equal(c.gallery[0].caption,'Original caption');
+  assert.deepEqual(c.gallery[0].sectionIds,['home']);
+  assert.deepEqual(c.gallery[0].postIds,['story']);
+  assert.notEqual(c.galleryAlbums[0].id,c.galleryAlbums[1].id);
+  assert.deepEqual(c.galleryAlbums[0],{id:'gallery-album-1-2',title:'Legacy album',description:'',coverId:''});
+  assert.deepEqual(galleryAlbumPictures(c).map(photo=>photo.title||photo.id),['Legacy photo','orphan']);
+  assert.deepEqual(galleryAlbumPictures(c,'gallery-album-1').map(photo=>photo.id),['photo-a','photo-b']);
+  assert.deepEqual(galleryAlbumPictures(c,'removed-album'),[]);
+  assert.deepEqual(normalizeContent(c),c);
+  c.galleryAlbums.reverse();c.galleryAlbums[0].title='Renamed album';c.gallery.reverse();
+  assert.deepEqual(galleryAlbumPictures(normalizeContent(c),'gallery-album-1').map(photo=>photo.id),['photo-b','photo-a']);
+  assert.equal(galleryAlbumCover(c,'gallery-album-1').id,'photo-b');
+  c.gallery.find(photo=>photo.id==='photo-a').albumId=c.galleryAlbums[1].id;
+  assert.deepEqual(galleryAlbumPictures(c,'gallery-album-1').map(photo=>photo.id),['photo-b']);
+  assert.deepEqual(galleryAlbumPictures(c,c.galleryAlbums[1].id).map(photo=>photo.id),['photo-a']);
+  assert.deepEqual(galleryAlbumPictures({},''),[]);
+});
+
+test('album covers are selected only from that album and fall back after moving or deleting a cover picture', () => {
+  const c=normalizeContent({profile:{photo:'/a.png'},portfolio:[{title:'Shared cover',image:'/a.png'}],galleryAlbums:[
+    {id:'album-a',title:'First album',coverId:'photo-b'},
+    {id:'album-b',title:'Second album',coverId:'photo-b'},
+    {id:'empty-album',title:'Empty album',coverId:'photo-a'}],gallery:[
+    {id:'photo-a',image:'/a.png',caption:'Keep caption',albumId:'album-a',sectionIds:['home'],serviceIds:['smm']},
+    {id:'photo-b',image:'/b.png',albumId:'album-b'},
+    {id:'photo-c',image:'/c.png',albumId:'album-a'}]});
+  assert.equal(galleryAlbumCover(c,'album-a').id,'photo-a','Cross-album cover falls back');
+  assert.equal(galleryAlbumCover(c,'album-b').id,'photo-b');
+  assert.equal(galleryAlbumCover(c,'empty-album'),undefined);
+  assert.equal(galleryAlbumCover(c,'missing-album'),undefined);
+  c.galleryAlbums[0].coverId='photo-c';
+  assert.equal(galleryAlbumCover(c,'album-a').id,'photo-c');
+  c.gallery[2].albumId='album-b';
+  assert.equal(galleryAlbumCover(c,'album-a').id,'photo-a','Moving selected cover falls back');
+  c.galleryAlbums[0].coverId='photo-a';c.galleryAlbums[2].coverId='photo-a';
+  removeContentItem(c,'gallery',0);
+  assert.equal(c.galleryAlbums[0].coverId,'');
+  assert.equal(c.galleryAlbums[2].coverId,'');
+  assert.equal(c.galleryAlbums[1].coverId,'photo-b');
+  assert.equal(c.profile.photo,'/a.png');
+  assert.equal(c.portfolio[0].image,'/a.png');
+  const beforePictures=structuredClone(c.gallery),beforeOtherAlbum=structuredClone(c.galleryAlbums[0]);
+  removeContentItem(c,'galleryAlbums',1);
+  assert.deepEqual(c.gallery,beforePictures.map(photo=>({...photo,albumId:''})));
+  assert.deepEqual(c.galleryAlbums[0],beforeOtherAlbum);
+  assert.deepEqual(galleryAlbumPictures(c).map(photo=>photo.id),['photo-b','photo-c']);
+  const placement=normalizeContent({galleryAlbums:[{id:'album',title:'Album'}],gallery:[{id:'placed',image:'/placed.png',albumId:'album',sectionIds:['home'],postIds:['story'],caption:'Original caption'}]});
+  const original=structuredClone(placement.gallery[0]);
+  removeContentItem(placement,'galleryAlbums',0);
+  assert.deepEqual(placement.gallery[0],{...original,albumId:''});
+  assert.equal(galleryForSection(placement,'home')[0].id,'placed');
+  assert.equal(galleryForRecord(placement,'posts','story')[0].id,'placed');
+});
+
+test('gallery album normalization preserves explicit malformed values for validation and never restores deleted albums', () => {
+  assert.deepEqual(normalizeContent({galleryAlbums:[]}).galleryAlbums,[]);
+  for(const invalid of [null,'invalid',{},[null],[false],[[]]])assert.deepEqual(normalizeContent({galleryAlbums:invalid}).galleryAlbums,invalid);
+  for(const id of [null,3,''])assert.equal(normalizeContent({galleryAlbums:[{id}]}).galleryAlbums[0].id,id);
+  for(const value of [null,3,[],{}]) {
+    for(const field of ['title','description','coverId'])assert.deepEqual(normalizeContent({galleryAlbums:[{[field]:value}]}).galleryAlbums[0][field],value);
+    assert.deepEqual(normalizeContent({gallery:[{albumId:value}]}).gallery[0].albumId,value);
+  }
 });

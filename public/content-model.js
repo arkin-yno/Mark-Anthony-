@@ -69,10 +69,19 @@ export function normalizeContent(input) {
     const storedGallery = c.gallery;
     c.gallery = collectionWithIds(storedGallery, 'gallery').map((item, index) =>
       storedGallery[index] && typeof storedGallery[index] === 'object' && !Array.isArray(storedGallery[index])
-        ? { title: '', caption: '', image: '', sectionIds: [], serviceIds: [], portfolioIds: [], projectIds: [],
+        ? { title: '', caption: '', image: '', albumId: '', sectionIds: [], serviceIds: [], portfolioIds: [], projectIds: [],
           postIds: [], experienceIds: [], toolIds: [], processIds: [], ...item,
           ...(Object.hasOwn(storedGallery[index], 'id') ? { id: storedGallery[index].id } : {}) }
         : storedGallery[index]);
+  }
+  if (c.galleryAlbums === undefined) c.galleryAlbums = [];
+  if (Array.isArray(c.galleryAlbums)) {
+    const storedAlbums = c.galleryAlbums;
+    c.galleryAlbums = collectionWithIds(storedAlbums, 'gallery-album').map((item, index) =>
+      storedAlbums[index] && typeof storedAlbums[index] === 'object' && !Array.isArray(storedAlbums[index])
+        ? { title: '', description: '', coverId: '', ...item,
+          ...(Object.hasOwn(storedAlbums[index], 'id') ? { id: storedAlbums[index].id } : {}) }
+        : storedAlbums[index]);
   }
   return c;
 }
@@ -149,6 +158,21 @@ export function experiencesForService(content, serviceId = '') {
 const galleryRelations = { services: 'serviceIds', portfolio: 'portfolioIds', projects: 'projectIds', posts: 'postIds',
   experiences: 'experienceIds', tools: 'toolIds', 'process.workflows': 'processIds', 'process.general': 'processIds' };
 
+export function galleryAlbumPictures(content, albumId = '') {
+  const albumIds = new Set((Array.isArray(content?.galleryAlbums) ? content.galleryAlbums : [])
+    .filter(album => typeof album?.id === 'string' && album.id).map(album => album.id));
+  if (albumId && !albumIds.has(albumId)) return [];
+  return (Array.isArray(content?.gallery) ? content.gallery : []).filter(item =>
+    typeof item?.image === 'string' && item.image.trim() &&
+    (albumId ? item.albumId === albumId : !albumIds.has(item.albumId)));
+}
+
+export function galleryAlbumCover(content, albumId) {
+  const pictures = galleryAlbumPictures(content, albumId);
+  const album = Array.isArray(content?.galleryAlbums) ? content.galleryAlbums.find(item => item?.id === albumId) : undefined;
+  return pictures.find(picture => picture.id === album?.coverId) || pictures[0];
+}
+
 export function galleryForSection(content, section) {
   return section && Array.isArray(content.gallery)
     ? content.gallery.filter(item => typeof item?.image === 'string' && item.image.trim() && Array.isArray(item.sectionIds) && item.sectionIds.includes(section))
@@ -192,6 +216,12 @@ export function removeContentItem(content, collection, index) {
   if (collection === 'process.workflows') unlink(content.experiences, 'processStepIds', new Set(removed.steps.map(step => step.id)));
   if (workflowSteps) unlink(content.experiences, 'processStepIds');
   if (collection === 'tools') unlink(content.toolGroups, 'toolIds');
+  if (collection === 'galleryAlbums' && Array.isArray(content.gallery)) content.gallery.forEach(picture => {
+    if (picture.albumId === removed.id) picture.albumId = '';
+  });
+  if (collection === 'gallery' && Array.isArray(content.galleryAlbums)) content.galleryAlbums.forEach(album => {
+    if (album.coverId === removed.id) album.coverId = '';
+  });
   const relation = { services: 'serviceIds', portfolio: 'portfolioIds', projects: 'projectIds', tools: 'toolIds',
     testimonials: 'testimonialIds', 'process.steps': 'processStepIds', posts: 'postIds' }[collection];
   if (relation) unlink(content.experiences, relation);

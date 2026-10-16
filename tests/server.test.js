@@ -38,7 +38,8 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     c.experiences=[{id:'client-experience',name:'Example company',kind:'company',role:'Marketing support',period:'2024–2025',location:'Remote',description:'Work history',highlights:'Campaign planning',image:'',url:'https://example.com',
       serviceIds:[c.services[0].id],portfolioIds:['website'],projectIds:['sample'],toolIds:[c.tools[0].id],testimonialIds:['testimonial-1'],processStepIds:['smm-audit'],postIds:['live'],links:[{id:'company-link',label:'Company website',url:'https://example.com'}]}];
     c.posts=[{id:'draft',title:'Private draft',excerpt:'',date:'2026-10-13',cover:'',published:false,blocks:[]},{id:'live',title:'Published story',excerpt:'A story',date:'2026-10-13',cover:'',published:true,blocks:[{type:'text',text:'Hello reader',image:'',caption:''}]}];
-    c.gallery=[{id:'shared-photo',title:'Campaign photo',caption:'My original caption',image:'/uploads/example.png',sectionIds:['home','portfolio','blog'],
+    c.galleryAlbums=[{id:'campaign-album',title:'Campaign work',description:'My original album description',coverId:'shared-photo'}];
+    c.gallery=[{id:'shared-photo',title:'Campaign photo',caption:'My original caption',image:'/uploads/example.png',albumId:'campaign-album',sectionIds:['home','portfolio','blog'],
       serviceIds:[c.services[0].id],portfolioIds:['website'],projectIds:['sample'],postIds:['live'],experienceIds:['client-experience'],toolIds:[c.tools[0].id],processIds:['general','smm-process']}];
     assert.equal((await req('/api/admin/content','PUT',c,{Origin:'https://other.example'})).status,403);
     assert.equal((await req('/api/admin/content','PUT',{...c,services:[{}]})).status,400);
@@ -73,9 +74,23 @@ test('authentication, content persistence, draft privacy, uploads, and password 
         assert.equal((await req('/api/admin/content','PUT',{...c,gallery:[{...c.gallery[0],[relation]:invalid}]})).status,400,'Reject malformed gallery '+relation);
       }
     }
-    const legacy=structuredClone(c);delete legacy.experiences;delete legacy.gallery;delete legacy.process.workflows;legacy.process.steps.forEach(step=>delete step.serviceIds);
+    for(const galleryAlbums of [null,'invalid',{},[null],[[]],[false],[c.galleryAlbums[0],c.galleryAlbums[0]],
+      [{...c.galleryAlbums[0],id:null}],[{...c.galleryAlbums[0],id:3}],[{...c.galleryAlbums[0],id:''}],[{...c.galleryAlbums[0],id:'x'.repeat(1001)}],
+      [{...c.galleryAlbums[0],title:3}],[{...c.galleryAlbums[0],description:null}],[{...c.galleryAlbums[0],description:'x'.repeat(100001)}],
+      [{...c.galleryAlbums[0],coverId:null}],[{...c.galleryAlbums[0],coverId:[]}],[{...c.galleryAlbums[0],coverId:'x'.repeat(1001)}],
+      Array.from({length:501},(_,i)=>({...c.galleryAlbums[0],id:'album-'+i}))]) {
+      assert.equal((await req('/api/admin/content','PUT',{...c,galleryAlbums})).status,400,'Reject malformed gallery albums');
+    }
+    for(const albumId of [null,3,[],{},'x'.repeat(1001)]) {
+      assert.equal((await req('/api/admin/content','PUT',{...c,gallery:[{...c.gallery[0],albumId}]})).status,400,'Reject malformed album assignment');
+    }
+    const legacy=structuredClone(c);delete legacy.experiences;delete legacy.gallery;delete legacy.galleryAlbums;delete legacy.process.workflows;legacy.process.steps.forEach(step=>delete step.serviceIds);
     assert.equal((await req('/api/admin/content','PUT',legacy)).status,200);
     assert.deepEqual((await (await req('/api/content')).json()).gallery,[]);
+    assert.deepEqual((await (await req('/api/content')).json()).galleryAlbums,[]);
+    const legacyPhotos=structuredClone(c);delete legacyPhotos.galleryAlbums;delete legacyPhotos.gallery[0].albumId;
+    assert.equal((await req('/api/admin/content','PUT',legacyPhotos)).status,200);
+    assert.equal((await (await req('/api/content')).json()).gallery[0].albumId,'');
     assert.equal((await req('/api/admin/content','PUT',c)).status,200);
     const pub=await (await req('/api/content')).json();
     assert.equal(pub.profile.headline,'Persisted headline');assert.deepEqual(pub.posts.map(p=>p.id),['live']);
@@ -85,8 +100,11 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.deepEqual(pub.experiences,c.experiences);
     assert.deepEqual(pub.process.workflows,c.process.workflows);
     assert.deepEqual(pub.gallery,c.gallery);
+    assert.deepEqual(pub.galleryAlbums,c.galleryAlbums);
     assert.equal((await req('/api/admin/content','PUT',{...c,gallery:[{...c.gallery[0],sectionIds:['bad']}]})).status,400);
     assert.deepEqual((await (await req('/api/admin/content')).json()).gallery,c.gallery);
+    assert.equal((await req('/api/admin/content','PUT',{...c,galleryAlbums:null})).status,400);
+    assert.deepEqual((await (await req('/api/admin/content')).json()).galleryAlbums,c.galleryAlbums);
     assert.equal((await (await req('/api/admin/content')).json()).posts.length,2);
     assert.equal((await req('/api/admin/upload','POST',{data:Buffer.from('<svg onload="alert(1)"></svg>').toString('base64')})).status,400);
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY1cAAAAASUVORK5CYII=';
@@ -109,6 +127,7 @@ test('authentication, content persistence, draft privacy, uploads, and password 
     assert.deepEqual(restored.process.workflows,c.process.workflows);
     assert.deepEqual(restored.experiences,c.experiences);
     assert.deepEqual(restored.gallery,c.gallery);
+    assert.deepEqual(restored.galleryAlbums,c.galleryAlbums);
     const again=await req('/api/login','POST',{password});cookie=again.headers.get('set-cookie').split(';')[0];
     const newPassword='A-long-test-password-4826';
     assert.equal((await req('/api/admin/password','POST',{password:newPassword})).status,200);
